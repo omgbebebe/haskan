@@ -17,6 +17,7 @@ import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
 
 -- haskan
@@ -65,7 +66,7 @@ createSwapchain dev surface extent = do
       &* set @"preTransform" preTransform
       )
 
-  swapchain <- liftIO $ allocaAndPeek (Vulkan.vkCreateSwapchainKHR dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)
+  swapchain <- liftIO $ withPtr createInfo $ \ptr -> allocaAndPeek (Vulkan.vkCreateSwapchainKHR dev ptr Vulkan.vkNullPtr)
   pure swapchain
 
 getSwapchainImages :: MonadIO m => Vulkan.VkDevice -> Vulkan.VkSwapchainKHR -> m [Vulkan.VkImage]
@@ -124,4 +125,4 @@ createImageView dev surfaceFormat img = do
       &* set @"layerCount" 1
       )
     format = Vulkan.getField @"format" surfaceFormat
-    in liftIO $ allocaAndPeek (Vulkan.vkCreateImageView dev (Vulkan.unsafePtr createInfo) Vulkan.VK_NULL)
+    in liftIO $ withPtr createInfo $ \ptr -> allocaAndPeek (Vulkan.vkCreateImageView dev ptr Vulkan.VK_NULL)

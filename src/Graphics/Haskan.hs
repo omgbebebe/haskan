@@ -1,7 +1,9 @@
+{-# language RankNTypes #-}
 module Graphics.Haskan where
 
 -- base
 import Control.Concurrent (threadDelay)
+import Control.Exception (bracket)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad (unless, replicateM, forever)
 import Data.Text (Text)
@@ -36,6 +38,8 @@ import qualified Graphics.Haskan.Window as Window
 
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
+ 
+import Control.Monad.Managed (MonadManaged, using, managed, managed_, with)
  
 data QueueFamily
   = Graphics
@@ -87,6 +91,34 @@ renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
       Render.FrameFailed err -> fail err
       --liftIO $ drawFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
       --liftIO $ presentFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
+  rr <- liftIO $ bracket
+    (putStrLn "(bracket+++) allocating" *> Semaphore.createSemaphore device)
+    (\ptr -> putStrLn ("(bracket) do something with res " <> show ptr))
+    (\ptr -> do
+        putStrLn "(bracket---) deallocating"
+        Vulkan.vkDestroySemaphore device ptr Vulkan.vkNullPtr
+    )
+  let
+    withSem :: forall r . (Vulkan.VkSemaphore -> IO r) -> IO r
+    withSem f =  bracket
+      (putStrLn "(managed+++) allocating" *> Semaphore.createSemaphore device)
+      (\ptr -> do
+          putStrLn "(managed--) deallocating"
+          Vulkan.vkDestroySemaphore device ptr Vulkan.vkNullPtr
+      )
+      f
+--  liftIO $ withSem (\ptr -> putStrLn ("(test) " <> show ptr))
+  let r2 = managed $ withSem
+  liftIO $ with r2 (\x -> putStrLn ("(bracket) " <> show x))
+{-
+  r2 <- managed $ bracket
+    (putStrLn "(managed+++) allocating new managed res" *> Semaphore.createSemaphore device)
+    (\ptr -> do
+        putStrLn "(managed---) deallocating sem via managed"
+        Vulkan.vkDestroySemaphore device ptr Vulkan.vkNullPtr
+    )
+  liftIO $ putStrLn ("(managed) do something with res" <> show r2)
+-}
   SDL.delay 200
   unless (qPressed || needRestart) (renderLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores)
   liftIO $ Vulkan.vkDeviceWaitIdle device
