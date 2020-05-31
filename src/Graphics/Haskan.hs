@@ -86,7 +86,7 @@ initHaskan title = runManaged $ do
 
   imageAvailableSemaphores <- replicateM Render.maxFramesInFlight (Semaphore.managedSemaphore device)
   renderFinishedSemaphores <- for imageViews (\_ -> Semaphore.managedSemaphore device)
-  renderFinishedFences <- for imageViews (\_ -> Fence.managedFence device)
+  renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
   for (zip framebuffers graphicsCommandBuffers)
     (\(fb, cb) -> CommandBuffer.withCommandBuffer cb
@@ -113,7 +113,7 @@ initHaskan title = runManaged $ do
 
       liftIO $ do
         let imageAvailableSemaphore = imageAvailableSemaphores !! (frameNumber)
-        imageIndex <- drawFrame ctx imageAvailableSemaphore
+        imageIndex <- drawFrame ctx imageAvailableSemaphore frameNumber
         presentFrame ctx imageIndex (renderFinishedSemaphores !! (fromIntegral imageIndex))
       --liftIO $ drawFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
       --liftIO $ presentFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler

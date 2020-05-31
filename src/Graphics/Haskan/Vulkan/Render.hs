@@ -29,8 +29,8 @@ data RenderContext =
                 }
   deriving (Show)
 
-drawFrame :: MonadIO m => RenderContext -> Vulkan.VkSemaphore -> m Vulkan.Word32
-drawFrame ctx@RenderContext{..} imageAvailableSemaphore = do
+drawFrame :: MonadIO m => RenderContext -> Vulkan.VkSemaphore -> Int -> m Vulkan.Word32
+drawFrame ctx@RenderContext{..} imageAvailableSemaphore fenceIndex = do
   let
 
   imageIndex <- liftIO $ allocaAndPeek $
@@ -40,7 +40,7 @@ drawFrame ctx@RenderContext{..} imageAvailableSemaphore = do
   let
     commandBuffer = graphicsCommandBuffers !! (fromIntegral imageIndex)
     renderFinishedSemaphore = renderFinishedSemaphores !! (fromIntegral imageIndex)
-    renderFinishedFence = renderFinishedFences !! (fromIntegral imageIndex)
+    renderFinishedFence = renderFinishedFences !! fenceIndex
     submitInfo = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_SUBMIT_INFO
       &* set @"pNext" Vulkan.vkNullPtr
