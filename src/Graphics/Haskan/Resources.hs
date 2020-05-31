@@ -5,6 +5,7 @@ module Graphics.Haskan.Resources
   , MonadManaged
   , allocaAndPeek
   , allocaAndPeek_
+  , allocaAndPeekVkResult
   , peekVkList
   , peekVkList_
   , throwVkResult
@@ -42,6 +43,12 @@ alloc_ resName create destroy = alloc resName create (\_ -> destroy)
 
 allocaAndPeek :: Storable a => (Vulkan.Ptr a -> IO Vulkan.VkResult) -> IO a
 allocaAndPeek f = Foreign.Marshal.Alloc.alloca (\ptr -> (f ptr >>= throwVkResult) *> Foreign.Storable.peek ptr)
+
+allocaAndPeekVkResult :: Storable a => (Vulkan.Ptr a -> IO Vulkan.VkResult) -> IO (a, Vulkan.VkResult)
+allocaAndPeekVkResult f = Foreign.Marshal.Alloc.alloca $ \ptr -> do
+  res <- f ptr
+  d <- Foreign.Storable.peek ptr
+  pure (d, res)
 
 allocaAndPeek_ :: Storable a => (Vulkan.Ptr a -> IO ()) -> IO a
 allocaAndPeek_ f = Foreign.Marshal.Alloc.alloca (\ptr -> f ptr *> Foreign.Storable.peek ptr)

@@ -1,10 +1,12 @@
 module Graphics.Haskan where
 
 -- base
+import Control.Concurrent (threadDelay)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad (unless, replicateM)
+import Control.Monad (unless, replicateM, forever)
 import Data.Text (Text)
 import Data.Traversable (for)
+import System.Mem
 -- managed
 import Control.Monad.Managed (runManaged)
 
@@ -52,77 +54,80 @@ initHaskan title = runManaged $ do
   surface          <- Window.managedSurface inst window
   physicalDevice   <- PhysicalDevice.selectPhysicalDevice inst surface
 
-  (device
-    , (graphicsQueueFamilyIndex, presentQueueFamilyIndex)
-    ) <- Device.managedRenderDevice physicalDevice surface layers
+  (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
+  Window.showWindow window
+  forever $ do
+    appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex
+    liftIO $ do
+      putStrLn "restarting appLoop..."
+      threadDelay (10^6)
+
+renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
+  events <- SDL.pollEvents
+  let
+    eventIsQPress event =
+      case SDL.eventPayload event of
+        SDL.KeyboardEvent keyboardEvent ->
+          SDL.keyboardEventKeyMotion keyboardEvent == SDL.Pressed &&
+          SDL.keysymKeycode (SDL.keyboardEventKeysym keyboardEvent) == SDL.KeycodeQ
+        _ -> False
+    qPressed = any eventIsQPress events
+
+  needRestart <- do
+    let imageAvailableSemaphore = imageAvailableSemaphores !! (frameNumber)
+    res <- liftIO $ drawFrame ctx imageAvailableSemaphore frameNumber
+    case res of
+      Render.FrameOk imageIndex -> do
+        liftIO $ presentFrame ctx imageIndex (renderFinishedSemaphores !! (fromIntegral imageIndex))
+        pure False
+      Render.FrameSuboptimal _ -> fail "suboptimal"
+      Render.FrameOutOfDate -> do
+        liftIO $ putStrLn "resizing swapchain"
+        pure True
+      Render.FrameFailed err -> fail err
+      --liftIO $ drawFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
+      --liftIO $ presentFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
+  SDL.delay 200
+  unless (qPressed || needRestart) (renderLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores)
+  liftIO $ Vulkan.vkDeviceWaitIdle device
+  pure ()
+
+appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex = do
+  liftIO $ putStrLn "starting render loop"
   graphicsQueueHandler <- Device.getDeviceQueueHandler device graphicsQueueFamilyIndex 0
   presentQueueHandler <- Device.getDeviceQueueHandler device presentQueueFamilyIndex 0
-  swapchain <- Swapchain.managedSwapchain device surface
-  -- TODO: embed imageViews somewhere
-  images <- Swapchain.getSwapchainImages device swapchain
-  imageViews <- for images (Swapchain.managedImageView device Swapchain.surfaceFormat)
 
   vertShader <- ShaderModule.managedShaderModule device "data/shaders/static/vert.spv"
   fragShader <- ShaderModule.managedShaderModule device "data/shaders/static/frag.spv"
 
-  renderPass <- RenderPass.managedRenderPass device Swapchain.surfaceFormat
 
   pipelineLayout <- PipelineLayout.managedPipelineLayout device
-  graphicsPipeline <-
-    GraphicsPipeline.managedGraphicsPipeline
-      device
-      Swapchain.surfaceFormat
-      pipelineLayout
-      renderPass
-      vertShader
-      fragShader
-      Swapchain.swapchainExtent
-
-  framebuffers <- for imageViews (Framebuffer.managedFramebuffer device renderPass Swapchain.swapchainExtent)
   graphicsCommandPool <- CommandPool.managedCommandPool device graphicsQueueFamilyIndex
 --  presentCommandPool <- CommandPool.managedCommandPool device presentQueueFamilyIndex
-  graphicsCommandBuffers   <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device graphicsCommandPool)
 --  presentCommandBuffers   <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device presentCommandPool)
 
   imageAvailableSemaphores <- replicateM Render.maxFramesInFlight (Semaphore.managedSemaphore device)
-  renderFinishedSemaphores <- for imageViews (\_ -> Semaphore.managedSemaphore device)
+  renderFinishedSemaphores <- replicateM 4 (Semaphore.managedSemaphore device)
   renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
-  for (zip framebuffers graphicsCommandBuffers)
-    (\(fb, cb) -> CommandBuffer.withCommandBuffer cb
-      (RenderPass.withRenderPass cb renderPass fb Swapchain.swapchainExtent $ do
-       GraphicsPipeline.cmdBindPipeline cb graphicsPipeline
-       CommandBuffer.cmdDraw cb
-      )
-    )
-   
-  Window.showWindow window
 
   let
-    ctx = RenderContext{..}
-    appLoop ctx frameNumber = do
-      events <- SDL.pollEvents
-      let
-        eventIsQPress event =
-          case SDL.eventPayload event of
-            SDL.KeyboardEvent keyboardEvent ->
-              SDL.keyboardEventKeyMotion keyboardEvent == SDL.Pressed &&
-              SDL.keysymKeycode (SDL.keyboardEventKeysym keyboardEvent) == SDL.KeycodeQ
-            _ -> False
-        qPressed = any eventIsQPress events
+    mkRenderContext = Render.createRenderContext
+      physicalDevice
+      device
+      surface
+      pipelineLayout
+      vertShader
+      fragShader
+      graphicsCommandPool
+      graphicsQueueHandler
+      presentQueueHandler
+      renderFinishedFences
+      renderFinishedSemaphores
 
-      liftIO $ do
-        let imageAvailableSemaphore = imageAvailableSemaphores !! (frameNumber)
-        imageIndex <- drawFrame ctx imageAvailableSemaphore frameNumber
-        presentFrame ctx imageIndex (renderFinishedSemaphores !! (fromIntegral imageIndex))
-      --liftIO $ drawFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
-      --liftIO $ presentFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
---      SDL.delay 20
-      unless qPressed (appLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight))
+  ctx <- mkRenderContext
+  renderLoop ctx 0 imageAvailableSemaphores
+  liftIO $ putStrLn "exiting appLoop"
 
-  appLoop ctx 0
   liftIO $ Vulkan.vkDeviceWaitIdle device
-  {-
-  Engine.mainLoop RenderContext{..}
-  -}
   pure ()

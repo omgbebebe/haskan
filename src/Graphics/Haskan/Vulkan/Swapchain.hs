@@ -26,17 +26,19 @@ managedSwapchain
   :: MonadManaged m
   => Vulkan.VkDevice
   -> Vulkan.VkSurfaceKHR
+  -> Vulkan.VkExtent2D
   -> m Vulkan.VkSwapchainKHR
-managedSwapchain dev surface = alloc "Swapchain"
-  (createSwapchain dev surface)
+managedSwapchain dev surface extent = alloc "Swapchain"
+  (createSwapchain dev surface extent)
   (\ptr -> Vulkan.vkDestroySwapchainKHR dev ptr Vulkan.vkNullPtr)
 
 createSwapchain
   :: MonadIO m
   => Vulkan.VkDevice
   -> Vulkan.VkSurfaceKHR
+  -> Vulkan.VkExtent2D
   -> m Vulkan.VkSwapchainKHR
-createSwapchain dev surface = do
+createSwapchain dev surface extent = do
   let
     imageFormat = Vulkan.VK_FORMAT_B8G8R8A8_SRGB
     imageColorSpace = Vulkan.VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
@@ -50,7 +52,7 @@ createSwapchain dev surface = do
       &* set @"minImageCount" (fromIntegral imageCount)
       &* set @"imageFormat" imageFormat
       &* set @"imageColorSpace" imageColorSpace
-      &* set @"imageExtent" swapchainExtent
+      &* set @"imageExtent" extent
       &* set @"imageArrayLayers" 1
       &* set @"imageUsage" Vulkan.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
       &* set @"imageSharingMode" Vulkan.VK_SHARING_MODE_EXCLUSIVE
@@ -81,15 +83,6 @@ surfaceFormat =
        &* set @"colorSpace" imageColorSpace
        )
 
-swapchainExtent :: Vulkan.VkExtent2D
-swapchainExtent =
-  let width = 1920
-      height = 1080
-  in Vulkan.createVk
-       (  set @"width" (fromIntegral width)
-       &* set @"height" (fromIntegral height)
-       )
-      
 managedImageView
   :: MonadManaged m
   => Vulkan.VkDevice

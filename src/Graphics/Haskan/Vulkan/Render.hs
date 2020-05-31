@@ -2,6 +2,7 @@ module Graphics.Haskan.Vulkan.Render where
 
 -- base
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Traversable (for)
 import Foreign.Marshal.Array
 
 -- vulkan-api
@@ -12,7 +13,20 @@ import qualified Graphics.Vulkan.Marshal.Create as Vulkan
 import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (throwVkResult, allocaAndPeek)
+import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
+import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
+import qualified Graphics.Haskan.Vulkan.Device as Device
+import qualified Graphics.Haskan.Vulkan.Fence as Fence
+import qualified Graphics.Haskan.Vulkan.Framebuffer as Framebuffer
+import qualified Graphics.Haskan.Vulkan.GraphicsPipeline as GraphicsPipeline
+import qualified Graphics.Haskan.Vulkan.Instance as Instance
+import qualified Graphics.Haskan.Vulkan.PipelineLayout as PipelineLayout
+import qualified Graphics.Haskan.Vulkan.PhysicalDevice as PhysicalDevice
+import qualified Graphics.Haskan.Vulkan.RenderPass as RenderPass
+import qualified Graphics.Haskan.Vulkan.Semaphore as Semaphore
+import qualified Graphics.Haskan.Vulkan.ShaderModule as ShaderModule
+import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
+import Graphics.Haskan.Resources (throwVkResult, allocaAndPeek, allocaAndPeekVkResult)
 
 maxFramesInFlight :: Int
 maxFramesInFlight = 2
@@ -29,14 +43,77 @@ data RenderContext =
                 }
   deriving (Show)
 
-drawFrame :: MonadIO m => RenderContext -> Vulkan.VkSemaphore -> Int -> m Vulkan.Word32
+type ImageIndex = Vulkan.Word32
+
+data RenderResult
+  = FrameOk ImageIndex
+  | FrameSuboptimal ImageIndex
+  | FrameOutOfDate
+  | FrameFailed String
+  deriving (Eq, Show)
+
+{-
+createRenderContext
+  :: (MonadIO m, MonadManaged m)
+  => Vulkan.VkPhysicalDevice
+  -> Vulkan.VkDevice
+  -> Vulkan.VkSurfaceKHR
+  -> Vulkan.VkPipelineLayout
+  -> Vulkan.VkShaderModule
+  -> Vulkan.VkShaderModule
+  -> Vulkan.VkCommandPool
+  -> Vulkan.VkQueue
+  -> Vulkan.VkQueue
+  -> [Vulkan.VkFence]
+  -> [Vulkan.VkSemaphore]
+  -> m RenderContext
+-}
+createRenderContext pdev device surface pipelineLayout vertShader fragShader graphicsCommandPool
+                    graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores = do
+  surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
+  swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
+  -- TODO: embed imageViews somewhere
+  images <- Swapchain.getSwapchainImages device swapchain
+  imageViews <- for images (Swapchain.managedImageView device Swapchain.surfaceFormat)
+  renderPass <- RenderPass.managedRenderPass device Swapchain.surfaceFormat
+  graphicsPipeline <-
+    GraphicsPipeline.managedGraphicsPipeline
+      device
+      Swapchain.surfaceFormat
+      pipelineLayout
+      renderPass
+      vertShader
+      fragShader
+      surfaceExtent
+  framebuffers <- for imageViews (Framebuffer.managedFramebuffer device renderPass surfaceExtent)
+  graphicsCommandBuffers   <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device graphicsCommandPool)
+ 
+  for (zip framebuffers graphicsCommandBuffers)
+    (\(fb, cb) -> CommandBuffer.withCommandBuffer cb
+      (RenderPass.withRenderPass cb renderPass fb surfaceExtent $ do
+       GraphicsPipeline.cmdBindPipeline cb graphicsPipeline
+       CommandBuffer.cmdDraw cb
+      )
+    )
+
+  pure RenderContext{..}
+
+
+drawFrame :: (MonadFail m, MonadIO m) => RenderContext -> Vulkan.VkSemaphore -> Int -> m RenderResult
 drawFrame ctx@RenderContext{..} imageAvailableSemaphore fenceIndex = do
   let
 
-  imageIndex <- liftIO $ allocaAndPeek $
+  (imageIndex, vkResult) <- liftIO $ allocaAndPeekVkResult $
     --Vulkan.vkAcquireNextImageKHR device swapchain maxBound imageAvailableSemaphore Vulkan.VK_NULL_HANDLE
     Vulkan.vkAcquireNextImageKHR device swapchain 100 imageAvailableSemaphore Vulkan.VK_NULL_HANDLE
---  liftIO $ putStr (show imageIndex <> " ")
+ 
+  case vkResult of
+    Vulkan.VK_SUCCESS -> FrameOk <$> renderImage ctx imageAvailableSemaphore fenceIndex imageIndex
+    Vulkan.VK_SUBOPTIMAL_KHR -> pure $ FrameSuboptimal imageIndex
+    Vulkan.VK_ERROR_OUT_OF_DATE_KHR -> pure FrameOutOfDate
+    _ -> pure $ FrameFailed (show vkResult)
+
+renderImage ctx@RenderContext{..} imageAvailableSemaphore fenceIndex imageIndex = do
   let
     commandBuffer = graphicsCommandBuffers !! (fromIntegral imageIndex)
     renderFinishedSemaphore = renderFinishedSemaphores !! (fromIntegral imageIndex)
