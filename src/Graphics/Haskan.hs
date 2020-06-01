@@ -8,7 +8,8 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad (unless, replicateM, forever)
 import Data.Text (Text)
 import Data.Traversable (for)
-import System.Mem
+import Control.Monad.IO.Class (MonadIO)
+
 -- managed
 import Control.Monad.Managed (runManaged)
 
@@ -60,12 +61,9 @@ initHaskan title = runManaged $ do
 
   (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
   Window.showWindow window
-  forever $ do
-    appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex
-    liftIO $ do
-      putStrLn "restarting appLoop..."
-      threadDelay (10^6)
+  appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex
 
+renderLoop :: (MonadFail m, MonadIO m) => RenderContext -> Int -> [Vulkan.VkSemaphore] -> m Bool
 renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
   events <- SDL.pollEvents
   let
@@ -89,40 +87,15 @@ renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
         liftIO $ putStrLn "resizing swapchain"
         pure True
       Render.FrameFailed err -> fail err
-      --liftIO $ drawFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
-      --liftIO $ presentFrame device swapchain imageAvailableSemaphore renderFinishedSemaphore graphicsCommandBuffers graphicsQueueHandler
-  rr <- liftIO $ bracket
-    (putStrLn "(bracket+++) allocating" *> Semaphore.createSemaphore device)
-    (\ptr -> putStrLn ("(bracket) do something with res " <> show ptr))
-    (\ptr -> do
-        putStrLn "(bracket---) deallocating"
-        Vulkan.vkDestroySemaphore device ptr Vulkan.vkNullPtr
-    )
-  let
-    withSem :: forall r . (Vulkan.VkSemaphore -> IO r) -> IO r
-    withSem f =  bracket
-      (putStrLn "(managed+++) allocating" *> Semaphore.createSemaphore device)
-      (\ptr -> do
-          putStrLn "(managed--) deallocating"
-          Vulkan.vkDestroySemaphore device ptr Vulkan.vkNullPtr
-      )
-      f
---  liftIO $ withSem (\ptr -> putStrLn ("(test) " <> show ptr))
-  let r2 = managed $ withSem
-  liftIO $ with r2 (\x -> putStrLn ("(bracket) " <> show x))
-{-
-  r2 <- managed $ bracket
-    (putStrLn "(managed+++) allocating new managed res" *> Semaphore.createSemaphore device)
-    (\ptr -> do
-        putStrLn "(managed---) deallocating sem via managed"
-        Vulkan.vkDestroySemaphore device ptr Vulkan.vkNullPtr
-    )
-  liftIO $ putStrLn ("(managed) do something with res" <> show r2)
--}
-  SDL.delay 200
-  unless (qPressed || needRestart) (renderLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores)
-  liftIO $ Vulkan.vkDeviceWaitIdle device
-  pure ()
+ 
+  if (qPressed || needRestart)
+  then do
+    liftIO $ Vulkan.vkDeviceWaitIdle device
+    liftIO $ putStrLn "===================== end renderLoop"
+    pure qPressed
+  else do
+    --SDL.delay 200
+    renderLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores
 
 appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex = do
   liftIO $ putStrLn "starting render loop"
@@ -157,9 +130,14 @@ appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQue
       renderFinishedFences
       renderFinishedSemaphores
 
-  ctx <- mkRenderContext
-  renderLoop ctx 0 imageAvailableSemaphores
-  liftIO $ putStrLn "exiting appLoop"
+  -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
+  let
+    loop exit = do
+      if exit
+      then pure ()
+      else do
+        qPressed <- liftIO $ with mkRenderContext $ \context -> renderLoop context 0 imageAvailableSemaphores
+        loop qPressed
 
-  liftIO $ Vulkan.vkDeviceWaitIdle device
+  loop False
   pure ()

@@ -12,6 +12,8 @@ import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
 import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
+-- managed
+import Control.Monad.Managed (MonadManaged)
 -- haskan
 import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
 import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
@@ -52,7 +54,6 @@ data RenderResult
   | FrameFailed String
   deriving (Eq, Show)
 
-{-
 createRenderContext
   :: (MonadIO m, MonadManaged m)
   => Vulkan.VkPhysicalDevice
@@ -67,7 +68,6 @@ createRenderContext
   -> [Vulkan.VkFence]
   -> [Vulkan.VkSemaphore]
   -> m RenderContext
--}
 createRenderContext pdev device surface pipelineLayout vertShader fragShader graphicsCommandPool
                     graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores = do
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
