@@ -10,7 +10,7 @@ import qualified Foreign.Ptr
 import Foreign.Storable (Storable)
 import qualified Foreign.Storable
 -- managed
-import Control.Monad.Managed (MonadManaged)
+import Control.Monad.Managed (MonadManaged, with)
 
 -- pretty-simple
 import Text.Pretty.Simple
@@ -37,10 +37,10 @@ managedBuffer
   -> Vulkan.VkDevice
   -> [a]
   -> (Vulkan.VkBufferUsageBitmask Vulkan.FlagMask)
-  -> m Vulkan.VkBuffer
+  -> m (Vulkan.VkBuffer, Vulkan.VkMemoryRequirements)
 managedBuffer pdev dev data' usage = alloc "Buffer"
   (createBuffer pdev dev data' usage)
-  (\ptr -> Vulkan.vkDestroyBuffer dev ptr Vulkan.vkNullPtr)
+  (\(ptr,_) -> Vulkan.vkDestroyBuffer dev ptr Vulkan.vkNullPtr)
 
 createBuffer
   :: (MonadFail m, MonadIO m, Storable a)
@@ -48,7 +48,7 @@ createBuffer
   -> Vulkan.VkDevice
   -> [a]
   -> (Vulkan.VkBufferUsageBitmask Vulkan.FlagMask)
-  -> m Vulkan.VkBuffer
+  -> m (Vulkan.VkBuffer, Vulkan.VkMemoryRequirements)
 createBuffer pdev dev data' usage = do
   let
     size = fromIntegral ((length data') * Foreign.sizeOf ( undefined :: Vertex))
@@ -65,9 +65,17 @@ createBuffer pdev dev data' usage = do
   pPrint buffer
   memoryRequirements <- allocaAndPeek_ (Vulkan.vkGetBufferMemoryRequirements dev buffer)
   pPrint memoryRequirements
-  memory <-
-    -- TODO: VkMemory MUST be managed
-    Memory.allocateMemoryFor
+
+  pure (buffer, memoryRequirements)
+
+createBufferMemory
+  :: (MonadFail m, MonadIO m)
+  => Vulkan.VkPhysicalDevice
+  -> Vulkan.VkDevice
+  -> Vulkan.VkMemoryRequirements
+  -> m Vulkan.VkDeviceMemory
+createBufferMemory pdev dev memoryRequirements =
+  Memory.allocateMemoryFor
     pdev
     dev
     memoryRequirements
@@ -75,17 +83,41 @@ createBuffer pdev dev data' usage = do
     , Vulkan.VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
     ]
 
+managedBufferMemory
+  :: MonadManaged m
+  => Vulkan.VkPhysicalDevice
+  -> Vulkan.VkDevice
+  -> Vulkan.VkMemoryRequirements
+  -> m Vulkan.VkDeviceMemory
+managedBufferMemory pdev dev memoryRequirements = alloc "Buffer memory"
+  (createBufferMemory pdev dev memoryRequirements)
+  (\ptr -> Vulkan.vkFreeMemory dev ptr Vulkan.vkNullPtr)
+
+bindBufferMemory
+  :: (MonadIO m, Storable a)
+  => Vulkan.VkDevice
+  -> Vulkan.VkBuffer
+  -> Vulkan.VkDeviceMemory
+  -> [a]
+  -> m ()
+bindBufferMemory dev buffer memory data' = do
+  let
+    size = fromIntegral ((length data') * Foreign.sizeOf ( undefined :: Vertex))
   liftIO $ do
+    putStrLn "bind memory"
     Vulkan.vkBindBufferMemory dev buffer memory 0 {- offset-} >>= throwVkResult
     memPtr <-
       allocaAndPeek (Vulkan.vkMapMemory dev memory 0 size Vulkan.VK_ZERO_FLAGS)
     Foreign.Marshal.pokeArray (Foreign.castPtr memPtr) data'
     Vulkan.vkUnmapMemory dev memory
-   
-  pure buffer
+    putStrLn "end bind memory"
 
 managedVertexBuffer :: MonadManaged m => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [Vertex] -> m Vulkan.VkBuffer
-managedVertexBuffer pdev dev vertices = managedBuffer pdev dev vertices Vulkan.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+managedVertexBuffer pdev dev vertices = do
+  (buffer, memoryRequirements) <- managedBuffer pdev dev vertices Vulkan.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+  memory <- managedBufferMemory pdev dev memoryRequirements
+  bindBufferMemory dev buffer memory vertices
+  pure buffer
 
 --managedIndexBuffer :: MonadManaged m => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> m Vulkan.VkBuffer
 --managedIndexBuffer pdev dev = managedBuffer pdev dev [] Vulkan.VK_BUFFER_USAGE_INDEX_BUFFER_BIT
