@@ -3,7 +3,8 @@ module Graphics.Haskan.Vulkan.Render where
 -- base
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Traversable (for)
-import Foreign.Marshal.Array
+import qualified Foreign
+import qualified Foreign.Marshal.Array
 
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
@@ -67,9 +68,10 @@ createRenderContext
   -> Vulkan.VkQueue
   -> [Vulkan.VkFence]
   -> [Vulkan.VkSemaphore]
+  -> [Vulkan.VkBuffer]
   -> m RenderContext
 createRenderContext pdev device surface pipelineLayout vertShader fragShader graphicsCommandPool
-                    graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores = do
+                    graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores bindBuffers = do
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
   -- TODO: embed imageViews somewhere
@@ -86,12 +88,18 @@ createRenderContext pdev device surface pipelineLayout vertShader fragShader gra
       fragShader
       surfaceExtent
   framebuffers <- for imageViews (Framebuffer.managedFramebuffer device renderPass surfaceExtent)
-  graphicsCommandBuffers   <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device graphicsCommandPool)
+
+  graphicsCommandBuffers <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device graphicsCommandPool)
  
   for (zip framebuffers graphicsCommandBuffers)
     (\(fb, cb) -> CommandBuffer.withCommandBuffer cb
       (RenderPass.withRenderPass cb renderPass fb surfaceExtent $ do
        GraphicsPipeline.cmdBindPipeline cb graphicsPipeline
+     
+       liftIO $ Foreign.Marshal.Array.withArray bindBuffers $ \buffers ->
+         Foreign.Marshal.Array.withArray [ 0 ] $ \offsets ->
+           Vulkan.vkCmdBindVertexBuffers cb 0 1 buffers offsets
+
        CommandBuffer.cmdDraw cb
       )
     )
@@ -104,8 +112,8 @@ drawFrame ctx@RenderContext{..} imageAvailableSemaphore fenceIndex = do
   let
 
   (imageIndex, vkResult) <- liftIO $ allocaAndPeekVkResult $
-    --Vulkan.vkAcquireNextImageKHR device swapchain maxBound imageAvailableSemaphore Vulkan.VK_NULL_HANDLE
-    Vulkan.vkAcquireNextImageKHR device swapchain 100 imageAvailableSemaphore Vulkan.VK_NULL_HANDLE
+    --Vulkan.vkAcquireNextImageKHR device swapchain 100 imageAvailableSemaphore Vulkan.VK_NULL_HANDLE
+    Vulkan.vkAcquireNextImageKHR device swapchain maxBound imageAvailableSemaphore Vulkan.VK_NULL_HANDLE
  
   case vkResult of
     Vulkan.VK_SUCCESS -> FrameOk <$> renderImage ctx imageAvailableSemaphore fenceIndex imageIndex

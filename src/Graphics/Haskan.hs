@@ -1,14 +1,15 @@
-{-# language RankNTypes #-}
 module Graphics.Haskan where
 
 -- base
-import Control.Concurrent (threadDelay)
-import Control.Exception (bracket)
+--import Control.Concurrent (threadDelay)
+--import Control.Exception (bracket)
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad (unless, replicateM, forever)
+import Control.Monad (replicateM)
 import Data.Text (Text)
-import Data.Traversable (for)
 import Control.Monad.IO.Class (MonadIO)
+
+-- linear
+import Linear (V2(..), V3(..))
 
 -- managed
 import Control.Monad.Managed (runManaged)
@@ -17,30 +18,33 @@ import Control.Monad.Managed (runManaged)
 import qualified SDL
 
 -- haskan
-import qualified Graphics.Haskan.Engine as Engine
+--import qualified Graphics.Haskan.Engine as Engine
 import qualified Graphics.Haskan.Events as Events
+import qualified Graphics.Haskan.Vertex (Vertex(..))
+
 import Graphics.Haskan.Vulkan.Render (RenderContext(..), drawFrame, presentFrame)
+import qualified Graphics.Haskan.Vulkan.Buffer as Buffer
 import qualified Graphics.Haskan.Vulkan.Render as Render
 --import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
 import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
-import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
+--import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
 import qualified Graphics.Haskan.Vulkan.Device as Device
 import qualified Graphics.Haskan.Vulkan.Fence as Fence
-import qualified Graphics.Haskan.Vulkan.Framebuffer as Framebuffer
-import qualified Graphics.Haskan.Vulkan.GraphicsPipeline as GraphicsPipeline
+--import qualified Graphics.Haskan.Vulkan.Framebuffer as Framebuffer
+--import qualified Graphics.Haskan.Vulkan.GraphicsPipeline as GraphicsPipeline
 import qualified Graphics.Haskan.Vulkan.Instance as Instance
 import qualified Graphics.Haskan.Vulkan.PipelineLayout as PipelineLayout
 import qualified Graphics.Haskan.Vulkan.PhysicalDevice as PhysicalDevice
-import qualified Graphics.Haskan.Vulkan.RenderPass as RenderPass
+--import qualified Graphics.Haskan.Vulkan.RenderPass as RenderPass
 import qualified Graphics.Haskan.Vulkan.Semaphore as Semaphore
 import qualified Graphics.Haskan.Vulkan.ShaderModule as ShaderModule
-import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
+--import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
 import qualified Graphics.Haskan.Window as Window
 
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
  
-import Control.Monad.Managed (MonadManaged, using, managed, managed_, with)
+import Control.Monad.Managed (MonadManaged, with)
  
 data QueueFamily
   = Graphics
@@ -61,7 +65,7 @@ initHaskan title = runManaged $ do
 
   (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
   Window.showWindow window
-  appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex
+  appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex
 
 renderLoop :: (MonadFail m, MonadIO m) => RenderContext -> Int -> [Vulkan.VkSemaphore] -> m Bool
 renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
@@ -90,21 +94,28 @@ renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
  
   if (qPressed || needRestart)
   then do
-    liftIO $ Vulkan.vkDeviceWaitIdle device
+    _ <- liftIO $ Vulkan.vkDeviceWaitIdle device
     liftIO $ putStrLn "===================== end renderLoop"
     pure qPressed
   else do
     --SDL.delay 200
     renderLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores
 
-appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex = do
+appLoop
+  :: MonadManaged m
+  => Vulkan.VkPtr Vulkan.VkSurfaceKHR_T
+  -> Vulkan.Ptr Vulkan.VkPhysicalDevice_T
+  -> Vulkan.VkDevice
+  -> Int
+  -> Int
+  -> m ()
+appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex = do
   liftIO $ putStrLn "starting render loop"
   graphicsQueueHandler <- Device.getDeviceQueueHandler device graphicsQueueFamilyIndex 0
   presentQueueHandler <- Device.getDeviceQueueHandler device presentQueueFamilyIndex 0
 
-  vertShader <- ShaderModule.managedShaderModule device "data/shaders/static/vert.spv"
-  fragShader <- ShaderModule.managedShaderModule device "data/shaders/static/frag.spv"
-
+  vertShader <- ShaderModule.managedShaderModule device "data/shaders/buffers/vert.spv"
+  fragShader <- ShaderModule.managedShaderModule device "data/shaders/buffers/frag.spv"
 
   pipelineLayout <- PipelineLayout.managedPipelineLayout device
   graphicsCommandPool <- CommandPool.managedCommandPool device graphicsQueueFamilyIndex
@@ -115,6 +126,15 @@ appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQue
   renderFinishedSemaphores <- replicateM 4 (Semaphore.managedSemaphore device)
   renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
+  vertexBuffer <-
+    Buffer.managedVertexBuffer
+    physicalDevice
+    device
+    [V2 (V3   0.5  (-0.5) 0.0) (V3 1.0 0.0 0.0)
+    ,V2 (V3   0.5  ( 0.5) 0.0) (V3 0.0 1.0 0.0)
+    ,V2 (V3 (-0.5) ( 0.5) 0.0) (V3 1.0 1.0 0.0)
+    ]
+  --indexBuffer <- Buffer.managedIndexBuffer physicalDevice device
 
   let
     mkRenderContext = Render.createRenderContext
@@ -129,6 +149,7 @@ appLoop window surface physicalDevice device graphicsQueueFamilyIndex presentQue
       presentQueueHandler
       renderFinishedFences
       renderFinishedSemaphores
+      [vertexBuffer]
 
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
   let

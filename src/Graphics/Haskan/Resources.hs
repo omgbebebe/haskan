@@ -12,7 +12,7 @@ module Graphics.Haskan.Resources
   ) where
 
 -- base
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Exception (bracket)
 import qualified Foreign.Marshal.Alloc
 import qualified Foreign.Marshal.Array
@@ -34,29 +34,29 @@ alloc resName create destroy =
   ( managed
     ( bracket
       (T.putStrLn ("allocate " <> resName) *> create)
-      (\r -> T.putStrLn ("deallocate " <> resName) *> destroy r)
+      (\r -> T.putStrLn ("deallocate " <> resName) *> (destroy r))
     )
   )
 
 alloc_ :: MonadManaged m => Text -> IO a -> IO b -> m a
 alloc_ resName create destroy = alloc resName create (\_ -> destroy)
 
-allocaAndPeek :: Storable a => (Vulkan.Ptr a -> IO Vulkan.VkResult) -> IO a
-allocaAndPeek f = Foreign.Marshal.Alloc.alloca (\ptr -> (f ptr >>= throwVkResult) *> Foreign.Storable.peek ptr)
+allocaAndPeek :: (MonadIO m, Storable a) => (Vulkan.Ptr a -> IO Vulkan.VkResult) -> m a
+allocaAndPeek f = liftIO $ Foreign.Marshal.Alloc.alloca (\ptr -> (f ptr >>= throwVkResult) *> Foreign.Storable.peek ptr)
 
-allocaAndPeekVkResult :: Storable a => (Vulkan.Ptr a -> IO Vulkan.VkResult) -> IO (a, Vulkan.VkResult)
-allocaAndPeekVkResult f = Foreign.Marshal.Alloc.alloca $ \ptr -> do
+allocaAndPeekVkResult :: (MonadIO m, Storable a) => (Vulkan.Ptr a -> IO Vulkan.VkResult) -> m (a, Vulkan.VkResult)
+allocaAndPeekVkResult f = liftIO $ Foreign.Marshal.Alloc.alloca $ \ptr -> do
   res <- f ptr
   d <- Foreign.Storable.peek ptr
   pure (d, res)
 
-allocaAndPeek_ :: Storable a => (Vulkan.Ptr a -> IO ()) -> IO a
-allocaAndPeek_ f = Foreign.Marshal.Alloc.alloca (\ptr -> f ptr *> Foreign.Storable.peek ptr)
+allocaAndPeek_ :: (MonadIO m, Storable a) => (Vulkan.Ptr a -> IO ()) -> m a
+allocaAndPeek_ f = liftIO $ Foreign.Marshal.Alloc.alloca (\ptr -> f ptr *> Foreign.Storable.peek ptr)
 
 peekVkList
-  :: (Storable a, Integral a, Storable b)
-  => (Vulkan.Ptr a -> Vulkan.Ptr b -> IO Vulkan.VkResult) -> IO [b]
-peekVkList vkGetList = do
+  :: (MonadIO m, Storable a, Integral a, Storable b)
+  => (Vulkan.Ptr a -> Vulkan.Ptr b -> IO Vulkan.VkResult) -> m [b]
+peekVkList vkGetList = liftIO $ do
   Foreign.Marshal.Alloc.alloca $ \pCount -> do
     vkGetList pCount Vulkan.VK_NULL >>= throwVkResult
     count <- Foreign.Storable.peek pCount
@@ -65,9 +65,9 @@ peekVkList vkGetList = do
       Foreign.Marshal.Array.peekArray (fromIntegral count) ptr
 
 peekVkList_
-  :: (Storable a, Integral a, Storable b)
-  => (Vulkan.Ptr a -> Vulkan.Ptr b -> IO ()) -> IO [b]
-peekVkList_ vkGetList = do
+  :: (MonadIO m, Storable a, Integral a, Storable b)
+  => (Vulkan.Ptr a -> Vulkan.Ptr b -> IO ()) -> m [b]
+peekVkList_ vkGetList = liftIO $ do
   Foreign.Marshal.Alloc.alloca $ \pCount -> do
     vkGetList pCount Vulkan.VK_NULL
     count <- Foreign.Storable.peek pCount

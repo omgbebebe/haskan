@@ -4,7 +4,12 @@ module Graphics.Haskan.Vulkan.GraphicsPipeline where
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bits ((.|.))
 import Data.Traversable (for)
+import qualified Foreign
+import qualified Foreign.C
 import qualified Foreign.Ptr
+
+-- linear
+import Linear (V3(..))
 -- managed
 import Control.Monad.Managed (MonadManaged)
 
@@ -21,6 +26,7 @@ import Graphics.Vulkan.Marshal.Create (set, setAt, setVkRef, setListRef, setStrR
 
 -- haskan
 import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_)
+import Graphics.Haskan.Vertex (Vertex)
 
 managedGraphicsPipeline
   :: MonadManaged m
@@ -64,13 +70,36 @@ createGraphicsPipeline dev surfaceFormat layout renderPass vertShader fragShader
       &* setStrRef @"pName" "main"
       )
     -- stages =
+    positionBindingDescription = Vulkan.createVk
+      (  set @"binding" 0
+      &* set @"stride" (fromIntegral (Foreign.sizeOf (undefined :: Vertex)))
+      &* set @"inputRate" Vulkan.VK_VERTEX_INPUT_RATE_VERTEX
+      )
+    positionAttributeDescription = Vulkan.createVk
+      (  set @"location" 0
+      &* set @"binding" 0
+      &* set @"format" Vulkan.VK_FORMAT_R32G32B32_SFLOAT
+      &* set @"offset" 0
+      )
+    colorAttributeDescription = Vulkan.createVk
+      (  set @"location" 1
+      &* set @"binding" 0
+      &* set @"format" Vulkan.VK_FORMAT_R32G32B32_SFLOAT
+      &* set @"offset" (fromIntegral (Foreign.sizeOf (undefined :: V3 Foreign.C.CFloat)))
+      )
+
     vertexInputStateCI = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
       &* set @"pNext" Vulkan.VK_NULL
-      &* set @"vertexBindingDescriptionCount" 0
-      &* set @"pVertexBindingDescriptions" Vulkan.VK_NULL
-      &* set @"vertexAttributeDescriptionCount" 0
-      &* set @"pVertexAttributeDescriptions" Vulkan.VK_NULL
+      &* set @"vertexBindingDescriptionCount" 1
+      &* setListRef @"pVertexBindingDescriptions"
+        [positionBindingDescription
+        ]
+      &* set @"vertexAttributeDescriptionCount" 2
+      &* setListRef @"pVertexAttributeDescriptions"
+        [positionAttributeDescription
+        ,colorAttributeDescription
+        ]
       )
     assemblyInputStateCI = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO

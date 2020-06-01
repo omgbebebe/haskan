@@ -17,7 +17,7 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
 executable haskan
-  ghc-options:         -optl-mconsole
+  ghc-options:         -optl-mconsole -O2 -threaded
   main-is:             Main.hs
   -- other-modules:
   -- other-extensions:
@@ -27,7 +27,7 @@ executable haskan
   default-language:    Haskell2010
 
 library
-  ghc-options:         -Wall
+  ghc-options:         -Wall -O2
   default-extensions:
                        DataKinds
                        LambdaCase
@@ -38,6 +38,8 @@ library
                        Graphics.Haskan.Engine
                        Graphics.Haskan.Events
                        Graphics.Haskan.Resources
+                       Graphics.Haskan.Vertex
+                       Graphics.Haskan.Vulkan.Buffer
                        Graphics.Haskan.Vulkan.CommandBuffer
                        Graphics.Haskan.Vulkan.CommandPool
                        Graphics.Haskan.Vulkan.Device
@@ -45,6 +47,7 @@ library
                        Graphics.Haskan.Vulkan.Framebuffer
                        Graphics.Haskan.Vulkan.GraphicsPipeline
                        Graphics.Haskan.Vulkan.Instance
+                       Graphics.Haskan.Vulkan.Memory
                        Graphics.Haskan.Vulkan.PipelineLayout
                        Graphics.Haskan.Vulkan.PhysicalDevice
                        Graphics.Haskan.Vulkan.RenderPass
@@ -52,6 +55,7 @@ library
                        Graphics.Haskan.Vulkan.ShaderModule
                        Graphics.Haskan.Vulkan.Semaphore
                        Graphics.Haskan.Vulkan.Swapchain
+                       Graphics.Haskan.Vulkan.VertexFormat
                        Graphics.Haskan.Window
   hs-source-dirs:      src
   default-language:    Haskell2010
