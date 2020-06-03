@@ -68,15 +68,16 @@ createRenderContext
   -> m RenderContext
 createRenderContext pdev device surface pipelineLayout vertShader fragShader descriptorSets graphicsCommandPool
                     graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores vertexBuffers indexBuffers = do
+  let depthFormat = Vulkan.VK_FORMAT_D16_UNORM
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
   -- TODO: embed imageViews somewhere
   images <- Swapchain.getSwapchainImages device swapchain
-  depthImage <- Swapchain.managedDepthImage pdev device surfaceExtent
+  depthImage <- Swapchain.managedDepthImage pdev device surfaceExtent depthFormat
   imageViews <- for images (Swapchain.managedImageView device Swapchain.surfaceFormat)
-  depthImageView <- Swapchain.managedDepthView device depthImage
+  depthImageView <- Swapchain.managedDepthView device depthImage depthFormat
 
-  renderPass <- RenderPass.managedRenderPass device Swapchain.surfaceFormat
+  renderPass <- RenderPass.managedRenderPass device Swapchain.surfaceFormat depthFormat
   graphicsPipeline <-
     GraphicsPipeline.managedGraphicsPipeline
       device

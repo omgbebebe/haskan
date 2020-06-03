@@ -146,8 +146,9 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
   renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
   let
-    zPos1 = (-1.0)
-    zPos2 = ( 1.0)
+    zPos1 = ( 5)
+    zPos2 = ( 1)
+    zPos3 = ( 3)
     vertices =
       [V2 (V3 (-1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) -- 0
       ,V2 (V3 (-1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) -- 1
@@ -158,12 +159,21 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
       ,V2 (V3 (-1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) -- 5
       ,V2 (V3 ( 1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) -- 6
       ,V2 (V3 ( 1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) -- 7
-      ]
-    indices = [ 0, 1, 2
-              , 2, 3, 0
 
-              , 4, 5, 6
-              , 6, 7, 4
+      ,V2 (V3 (-1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) -- 8
+      ,V2 (V3 (-1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) -- 9
+      ,V2 (V3 ( 1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) -- 10
+      ,V2 (V3 ( 1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) -- 11
+      ]
+    indices = [
+        0, 1, 2
+      , 2, 3, 0
+
+      , 4, 5, 6
+      , 6, 7, 4
+
+      , 8, 9, 10
+      , 10, 11, 8
               ]
 
   vertexBuffer <-
@@ -198,6 +208,7 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
       modelViewProjection :: M44 Foreign.C.CFloat
       modelViewProjection =
         Linear.Matrix.transpose (projection !*! view !*! model)
+        --(projection !*! view !*! model)
     in Buffer.managedUniformBuffer
        physicalDevice
        device

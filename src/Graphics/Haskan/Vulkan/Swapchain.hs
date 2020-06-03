@@ -128,10 +128,11 @@ managedDepthImage
   => Vulkan.VkPhysicalDevice
   -> Vulkan.VkDevice
   -> Vulkan.VkExtent2D
+  -> Vulkan.VkFormat
   -> m Vulkan.VkImage
-managedDepthImage pdev dev extent = do
+managedDepthImage pdev dev extent depthFormat = do
   image <- alloc "Depth image"
-    (createDepthImage dev extent)
+    (createDepthImage dev extent depthFormat)
     (\ptr -> Vulkan.vkDestroyImage dev ptr Vulkan.vkNullPtr)
   memoryRequirements <- getImageMemoryRequirements dev image
   memory <- managedMemoryFor pdev dev memoryRequirements [Vulkan.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT]
@@ -142,8 +143,9 @@ createDepthImage
   :: MonadIO m
   => Vulkan.VkDevice
   -> Vulkan.VkExtent2D
+  -> Vulkan.VkFormat
   -> m Vulkan.VkImage
-createDepthImage dev extent = do
+createDepthImage dev extent depthFormat = do
   let
     depthExtent = Vulkan.createVk
       (  set @"width" (Vulkan.getField @"width" extent)
@@ -161,7 +163,7 @@ createDepthImage dev extent = do
       &* set @"pQueueFamilyIndices" Vulkan.VK_NULL
       &* set @"usage" Vulkan.VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
       &* set @"tiling" Vulkan.VK_IMAGE_TILING_OPTIMAL
-      &* set @"format" Vulkan.VK_FORMAT_D16_UNORM
+      &* set @"format" depthFormat
       &* set @"samples" Vulkan.VK_SAMPLE_COUNT_1_BIT
       &* set @"arrayLayers" 1
       &* set @"mipLevels" 1
@@ -174,17 +176,19 @@ managedDepthView
   :: MonadManaged m
   => Vulkan.VkDevice
   -> Vulkan.VkImage
+  -> Vulkan.VkFormat
   -> m Vulkan.VkImageView
-managedDepthView dev img = alloc "ImageView"
-  (createDepthView dev img)
+managedDepthView dev img depthFormat = alloc "ImageView"
+  (createDepthView dev img depthFormat)
   (\ptr -> Vulkan.vkDestroyImageView dev ptr Vulkan.vkNullPtr)
 
 createDepthView
   :: MonadIO m
   => Vulkan.VkDevice
   -> Vulkan.VkImage
+  -> Vulkan.VkFormat
   -> m Vulkan.VkImageView
-createDepthView dev img = do
+createDepthView dev img depthFormat = do
   let
     createInfo = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
@@ -208,7 +212,7 @@ createDepthView dev img = do
       &* set @"baseArrayLayer" 0
       &* set @"layerCount" 1
       )
-    format = Vulkan.VK_FORMAT_D16_UNORM
+    format = depthFormat
     in liftIO $ withPtr createInfo $ \ptr -> allocaAndPeek (Vulkan.vkCreateImageView dev ptr Vulkan.VK_NULL)
 
 getImageMemoryRequirements

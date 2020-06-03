@@ -135,6 +135,7 @@ createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExte
       &* set @"lineWidth" 1.0
       &* set @"cullMode" Vulkan.VK_CULL_MODE_BACK_BIT
       &* set @"frontFace" Vulkan.VK_FRONT_FACE_COUNTER_CLOCKWISE
+      -- &* set @"frontFace" Vulkan.VK_FRONT_FACE_CLOCKWISE
       &* set @"depthBiasEnable" Vulkan.VK_FALSE
       &* set @"depthBiasConstantFactor" 0.0
       &* set @"depthBiasClamp" 0.0
@@ -156,7 +157,7 @@ createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExte
           (  set @"failOp" Vulkan.VK_STENCIL_OP_KEEP
           &* set @"passOp" Vulkan.VK_STENCIL_OP_KEEP
           &* set @"depthFailOp" Vulkan.VK_STENCIL_OP_KEEP
-          &* set @"compareOp" Vulkan.VK_COMPARE_OP_ALWAYS
+          &* set @"compareOp" Vulkan.VK_COMPARE_OP_NEVER
           &* set @"compareMask" 0
           &* set @"writeMask" 0
           &* set @"reference" 0
@@ -167,8 +168,8 @@ createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExte
          &* set @"flags" Vulkan.VK_ZERO_FLAGS
          &* set @"depthTestEnable" Vulkan.VK_TRUE
          &* set @"depthWriteEnable" Vulkan.VK_TRUE
-         -- &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_LESS_OR_EQUAL
-         &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_GREATER
+         &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_LESS_OR_EQUAL
+         -- &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_GREATER_OR_EQUAL
          &* set @"depthBoundsTestEnable" Vulkan.VK_FALSE
          &* set @"stencilTestEnable" Vulkan.VK_FALSE
          &* set @"front" nullStencilOp

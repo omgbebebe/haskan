@@ -16,13 +16,23 @@ import Graphics.Vulkan.Marshal.Create (set, setAt, setListRef, setVkRef, (&*))
 -- haskan
 import Graphics.Haskan.Resources (alloc, allocaAndPeek)
 
-managedRenderPass :: MonadManaged m => Vulkan.VkDevice -> Vulkan.VkSurfaceFormatKHR -> m Vulkan.VkRenderPass
-managedRenderPass dev surfaceFormat = alloc "RenderPass"
-  (createRenderPass dev surfaceFormat)
+managedRenderPass
+  :: MonadManaged m
+  => Vulkan.VkDevice
+  -> Vulkan.VkSurfaceFormatKHR
+  -> Vulkan.VkFormat
+  -> m Vulkan.VkRenderPass
+managedRenderPass dev surfaceFormat depthFormat = alloc "RenderPass"
+  (createRenderPass dev surfaceFormat depthFormat)
   (\ptr -> Vulkan.vkDestroyRenderPass dev ptr Vulkan.vkNullPtr)
 
-createRenderPass :: MonadIO m => Vulkan.VkDevice -> Vulkan.VkSurfaceFormatKHR -> m Vulkan.VkRenderPass
-createRenderPass dev surfaceFormat =
+createRenderPass
+  :: MonadIO m
+  => Vulkan.VkDevice
+  -> Vulkan.VkSurfaceFormatKHR
+  -> Vulkan.VkFormat
+  -> m Vulkan.VkRenderPass
+createRenderPass dev surfaceFormat depthFormat =
   let
     imageFormat = Vulkan.getField @"format" surfaceFormat
     colorAttachment = Vulkan.createVk
@@ -40,7 +50,7 @@ createRenderPass dev surfaceFormat =
       &* set @"layout" Vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
       )
     depthAttachment = Vulkan.createVk
-      (  set @"format" Vulkan.VK_FORMAT_D16_UNORM
+      (  set @"format" depthFormat
       &* set @"samples" Vulkan.VK_SAMPLE_COUNT_1_BIT
       &* set @"loadOp" Vulkan.VK_ATTACHMENT_LOAD_OP_CLEAR
       &* set @"storeOp" Vulkan.VK_ATTACHMENT_STORE_OP_DONT_CARE
@@ -102,7 +112,7 @@ withRenderPass commandBuffer renderPass framebuffer extent action =
       &* setAt @"float32" @3 1.0
       )
     depthClear = Vulkan.createVk
-      (  set @"depth" 0
+      (  set @"depth" 1
       &* set @"stencil" 0
       )
     clearColorValue = Vulkan.createVk (set @"color" blue)
