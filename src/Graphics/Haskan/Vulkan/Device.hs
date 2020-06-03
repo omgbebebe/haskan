@@ -1,26 +1,21 @@
 module Graphics.Haskan.Vulkan.Device where
 
 -- base
-import Control.Monad (filterM, guard)
+import Control.Monad (filterM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Bits ((.&.), (.|.))
-import Data.Traversable (for)
+import Data.Bits ((.&.))
 -- managed
 import Control.Monad.Managed (MonadManaged)
-
--- pretty-simple
-import Text.Pretty.Simple
 
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
-import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
 import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek, allocaAndPeek_, peekVkList_)
 
 managedRenderDevice :: MonadManaged m => Vulkan.VkPhysicalDevice -> Vulkan.VkSurfaceKHR -> [String] -> m (Vulkan.VkDevice, (Int,Int))
 managedRenderDevice pdev surface layers = alloc "Vulkan Render Device"

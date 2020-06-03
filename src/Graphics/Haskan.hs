@@ -13,11 +13,15 @@ import qualified Foreign.C
 -- clock
 --import qualified System.Clock
 
+-- lens
+import Control.Lens ((&), (.~))
+
 -- linear
-import Linear (V2(..), V3(..))
-import Linear.Matrix (M44(..), (!*!))
+import Linear (V2(..), V3(..), M44, fromQuaternion)
+import Linear.Matrix ((!*!), identity, m33_to_m44, translation)
 import qualified Linear.Matrix
 import qualified Linear.Projection
+import qualified Linear.Quaternion
 
 -- managed
 import Control.Monad.Managed (runManaged)
@@ -25,13 +29,9 @@ import Control.Monad.Managed (runManaged)
 -- sdl2
 import qualified SDL
 
--- vector
-import qualified Data.Vector as Vector
-
 -- haskan
 --import qualified Graphics.Haskan.Engine as Engine
 import qualified Graphics.Haskan.Events as Events
-import Graphics.Haskan.Vertex (Vertex)
 
 import Graphics.Haskan.Vulkan.Render (RenderContext(..), drawFrame, presentFrame)
 import qualified Graphics.Haskan.Vulkan.Buffer as Buffer
@@ -75,7 +75,7 @@ initHaskan title = runManaged $ do
   (windowExts, window) <- Window.managedWindow title (initWidth, initHeight)
   (inst, layers)   <- Instance.managedInstance windowExts
   surface          <- Window.managedSurface inst window
-  physicalDevice   <- PhysicalDevice.selectPhysicalDevice inst surface
+  physicalDevice   <- PhysicalDevice.selectPhysicalDevice inst
 
   (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
   Window.showWindow window
@@ -146,15 +146,24 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
   renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
   let
-    zPos = (5.0)
+    zPos1 = (-1.0)
+    zPos2 = ( 1.0)
     vertices =
-      [V2 (V3 (-1.0) ( 1.0) zPos) (V3 1.0 0.0 0.0)
-      ,V2 (V3 (-1.0) (-1.0) zPos) (V3 0.0 1.0 0.0)
-      ,V2 (V3 ( 1.0) (-1.0) zPos) (V3 1.0 1.0 0.0)
-      ,V2 (V3 ( 1.0) ( 1.0) zPos) (V3 1.0 1.0 1.0)
+      [V2 (V3 (-1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) -- 0
+      ,V2 (V3 (-1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) -- 1
+      ,V2 (V3 ( 1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) -- 2
+      ,V2 (V3 ( 1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) -- 3
+
+      ,V2 (V3 (-1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) -- 4
+      ,V2 (V3 (-1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) -- 5
+      ,V2 (V3 ( 1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) -- 6
+      ,V2 (V3 ( 1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) -- 7
       ]
     indices = [ 0, 1, 2
               , 2, 3, 0
+
+              , 4, 5, 6
+              , 6, 7, 4
               ]
 
   vertexBuffer <-
@@ -175,7 +184,10 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
       view =
         Linear.Projection.lookAt (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0) (V3 0.0 (-1.0) 0.0)
       model =
-        Linear.Matrix.identity
+        let
+          rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
+          translate = identity & translation .~ V3 0 0 (5.0)
+        in translate !*! rotate
       projection =
         Linear.Projection.perspective
         (pi / 6) -- FOV

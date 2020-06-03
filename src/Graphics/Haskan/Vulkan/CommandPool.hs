@@ -1,26 +1,19 @@
 module Graphics.Haskan.Vulkan.CommandPool where
 
 -- base
-import Control.Monad (filterM, guard)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Bits ((.&.), (.|.))
-import Data.Traversable (for)
+
 -- managed
 import Control.Monad.Managed (MonadManaged)
-
--- pretty-simple
-import Text.Pretty.Simple
 
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
-import qualified Graphics.Vulkan.Ext as Vulkan
-import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal.Create (set, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek)
 
 managedCommandPool
   :: MonadManaged m

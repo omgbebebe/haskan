@@ -14,12 +14,11 @@ import Control.Monad.Managed (MonadManaged)
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
-import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal.Create (set, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_, throwVkResult)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek, allocaAndPeek_)
 
 managedMemoryFor
   :: MonadManaged m

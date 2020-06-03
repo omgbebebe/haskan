@@ -3,58 +3,49 @@ module Graphics.Haskan.Vulkan.GraphicsPipeline where
 -- base
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Bits ((.|.))
-import Data.Traversable (for)
 import qualified Foreign
 import qualified Foreign.C
-import qualified Foreign.Ptr
 
 -- linear
 import Linear (V3(..))
+
 -- managed
 import Control.Monad.Managed (MonadManaged)
-
--- pretty-simple
-import Text.Pretty.Simple
 
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
-import qualified Graphics.Vulkan.Ext as Vulkan
-import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setAt, setVkRef, setListRef, setStrRef, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal.Create (set, setAt, setVkRef, setListRef, setStrRef, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek)
 import Graphics.Haskan.Vertex (Vertex)
 
 managedGraphicsPipeline
   :: MonadManaged m
   => Vulkan.VkDevice
-  -> Vulkan.VkSurfaceFormatKHR
   -> Vulkan.VkPipelineLayout
   -> Vulkan.VkRenderPass
   -> Vulkan.VkShaderModule
   -> Vulkan.VkShaderModule
   -> Vulkan.VkExtent2D
   -> m Vulkan.VkPipeline
-managedGraphicsPipeline dev surfaceFormat layout renderPass vertShader fragShader swapchainExtent = alloc "GraphicsPipeline"
-  (createGraphicsPipeline dev surfaceFormat layout renderPass vertShader fragShader swapchainExtent)
+managedGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent = alloc "GraphicsPipeline"
+  (createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent)
   (\ptr -> Vulkan.vkDestroyPipeline dev ptr Vulkan.vkNullPtr)
 
 createGraphicsPipeline
   :: MonadIO m
   => Vulkan.VkDevice
-  -> Vulkan.VkSurfaceFormatKHR
   -> Vulkan.VkPipelineLayout
   -> Vulkan.VkRenderPass
   -> Vulkan.VkShaderModule
   -> Vulkan.VkShaderModule
   -> Vulkan.VkExtent2D
   -> m Vulkan.VkPipeline
-createGraphicsPipeline dev surfaceFormat layout renderPass vertShader fragShader swapchainExtent = do
+createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent = do
   let
-    swapchainImageFormat = Vulkan.getField @"format" surfaceFormat
     vertStage = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
       &* set @"pNext" Vulkan.VK_NULL
@@ -159,7 +150,31 @@ createGraphicsPipeline dev surfaceFormat layout renderPass vertShader fragShader
       &* set @"alphaToCoverageEnable" Vulkan.VK_FALSE
       &* set @"alphaToOneEnable" Vulkan.VK_FALSE
       )
-    depthStencilState = Vulkan.VK_NULL
+    depthStencilState =
+      let
+        nullStencilOp = Vulkan.createVk
+          (  set @"failOp" Vulkan.VK_STENCIL_OP_KEEP
+          &* set @"passOp" Vulkan.VK_STENCIL_OP_KEEP
+          &* set @"depthFailOp" Vulkan.VK_STENCIL_OP_KEEP
+          &* set @"compareOp" Vulkan.VK_COMPARE_OP_ALWAYS
+          &* set @"compareMask" 0
+          &* set @"writeMask" 0
+          &* set @"reference" 0
+          )
+      in Vulkan.createVk
+         (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO
+         &* set @"pNext" Vulkan.VK_NULL
+         &* set @"flags" Vulkan.VK_ZERO_FLAGS
+         &* set @"depthTestEnable" Vulkan.VK_TRUE
+         &* set @"depthWriteEnable" Vulkan.VK_TRUE
+         &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_LESS_OR_EQUAL
+         &* set @"depthBoundsTestEnable" Vulkan.VK_FALSE
+         &* set @"stencilTestEnable" Vulkan.VK_FALSE
+         &* set @"front" nullStencilOp
+         &* set @"back" nullStencilOp
+         &* set @"minDepthBounds" 0
+         &* set @"maxDepthBounds" 1
+         )
     colorBlendState = let
       colorBlendAttachment = Vulkan.createVk
         (  set @"colorWriteMask"
@@ -217,7 +232,7 @@ createGraphicsPipeline dev surfaceFormat layout renderPass vertShader fragShader
       &* setVkRef @"pViewportState" viewportState
       &* setVkRef @"pRasterizationState" rasterizationState
       &* setVkRef @"pMultisampleState" multisampleState
-      &* set @"pDepthStencilState" depthStencilState
+      &* setVkRef @"pDepthStencilState" depthStencilState
       &* setVkRef @"pColorBlendState" colorBlendState
       &* setVkRef @"pDynamicState" dynamicState
       &* set @"layout" layout

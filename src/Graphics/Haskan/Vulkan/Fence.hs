@@ -9,12 +9,11 @@ import Control.Monad.Managed (MonadManaged)
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
-import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
+import Graphics.Vulkan.Marshal.Create (set, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, peekVkList)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek)
 
 managedFence :: MonadManaged m => Vulkan.VkDevice -> m Vulkan.VkFence
 managedFence dev = alloc "Vulkan Fence"

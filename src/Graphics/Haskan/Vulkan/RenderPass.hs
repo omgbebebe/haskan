@@ -2,24 +2,19 @@ module Graphics.Haskan.Vulkan.RenderPass where
 
 -- base
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Traversable (for)
-import qualified Foreign.Ptr
+
 -- managed
 import Control.Monad.Managed (MonadManaged)
-
--- pretty-simple
-import Text.Pretty.Simple
 
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
-import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setAt, setListRef, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal.Create (set, setAt, setListRef, setVkRef, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek)
 
 managedRenderPass :: MonadManaged m => Vulkan.VkDevice -> Vulkan.VkSurfaceFormatKHR -> m Vulkan.VkRenderPass
 managedRenderPass dev surfaceFormat = alloc "RenderPass"
@@ -44,12 +39,27 @@ createRenderPass dev surfaceFormat =
       (  set @"attachment" 0
       &* set @"layout" Vulkan.VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
       )
+    depthAttachment = Vulkan.createVk
+      (  set @"format" Vulkan.VK_FORMAT_D16_UNORM
+      &* set @"samples" Vulkan.VK_SAMPLE_COUNT_1_BIT
+      &* set @"loadOp" Vulkan.VK_ATTACHMENT_LOAD_OP_CLEAR
+      &* set @"storeOp" Vulkan.VK_ATTACHMENT_STORE_OP_DONT_CARE
+      &* set @"stencilLoadOp" Vulkan.VK_ATTACHMENT_LOAD_OP_DONT_CARE
+      &* set @"stencilStoreOp" Vulkan.VK_ATTACHMENT_STORE_OP_DONT_CARE
+      &* set @"initialLayout" Vulkan.VK_IMAGE_LAYOUT_UNDEFINED
+      &* set @"finalLayout" Vulkan.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+      )
+    depthAttachmentRef = Vulkan.createVk
+      (  set @"attachment" 1
+      &* set @"layout" Vulkan.VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+      )
     subpass = Vulkan.createVk
       (  set @"pipelineBindPoint" Vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS
       &* set @"colorAttachmentCount" 1
       &* setListRef @"pColorAttachments" [colorAttachmentRef]
       &* set @"inputAttachmentCount" 0
       &* setListRef @"pInputAttachments" []
+      &* setVkRef @"pDepthStencilAttachment" depthAttachmentRef
       &* set @"preserveAttachmentCount" 0
       &* setListRef @"pPreserveAttachments" []
       )
@@ -64,8 +74,10 @@ createRenderPass dev surfaceFormat =
     renderPassCI = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO
       &* set @"pNext" Vulkan.VK_NULL
-      &* set @"attachmentCount" 1
-      &* setListRef @"pAttachments" [colorAttachment]
+      &* set @"attachmentCount" 2
+      &* setListRef @"pAttachments" [colorAttachment, depthAttachment]
+--      &* set @"attachmentCount" 1
+--      &* setListRef @"pAttachments" [colorAttachment]
       &* set @"subpassCount" 1
       &* setListRef @"pSubpasses" [subpass]
       &* set @"dependencyCount" 1
@@ -89,7 +101,12 @@ withRenderPass commandBuffer renderPass framebuffer extent action =
       &* setAt @"float32" @2 1.0
       &* setAt @"float32" @3 1.0
       )
+    depthClear = Vulkan.createVk
+      (  set @"depth" 0
+      &* set @"stencil" 0
+      )
     clearColorValue = Vulkan.createVk (set @"color" blue)
+    clearDepthValue = Vulkan.createVk (set @"depthStencil" depthClear)
     offset = Vulkan.createVk
       (  set @"x" 0
       &* set @"y" 0
@@ -104,8 +121,8 @@ withRenderPass commandBuffer renderPass framebuffer extent action =
       &* set @"renderPass" renderPass
       &* set @"framebuffer" framebuffer
       &* set @"renderArea" renderArea
-      &* set @"clearValueCount" 1
-      &* setListRef @"pClearValues" [clearColorValue]
+      &* set @"clearValueCount" 2
+      &* setListRef @"pClearValues" [clearColorValue, clearDepthValue]
       )
     begin = liftIO $ Vulkan.vkCmdBeginRenderPass commandBuffer (Vulkan.unsafePtr beginInfo) Vulkan.VK_SUBPASS_CONTENTS_INLINE
     end = liftIO $ Vulkan.vkCmdEndRenderPass commandBuffer

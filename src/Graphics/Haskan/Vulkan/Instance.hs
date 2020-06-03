@@ -2,17 +2,11 @@ module Graphics.Haskan.Vulkan.Instance where
 
 -- base
 import Control.Monad.IO.Class (MonadIO)
-import Data.List (elem, partition)
-import qualified Data.List as List
-import Data.Traversable (for)
-import qualified Foreign.Storable
-import qualified Foreign.C.String
-import qualified Foreign.Marshal.Alloc
-import qualified Foreign.Marshal.Array
+import Data.Foldable (for_)
+import Data.List (partition)
 
 -- byetstring
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
 
 -- managed
@@ -30,15 +24,12 @@ import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 
 -- vulkan-api
-import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
-import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import qualified Graphics.Vulkan.Marshal as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal.Create (set, setStrListRef, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, peekVkList)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek, peekVkList)
 
 managedInstance :: MonadManaged m => [ByteString] -> m (Vulkan.VkInstance, [String])
 managedInstance extraExtensions = alloc "VkInstance"
@@ -54,9 +45,9 @@ createInstance extraExtensions = do
         (optHave, optMissing) = partition (`elem` available) optional
         (reqHave, reqMissing) = partition (`elem` available) required
         tShow = T.pack . show
-      for optMissing
+      for_ optMissing
         (\n -> sayErr ("Missing optional " <> type' <> ": " <> tShow n))
-      for reqMissing
+      for_ reqMissing
         (\n -> sayErr ("Missing required " <> type' <> ": " <> tShow n))
       pure (reqHave <> optHave)
 

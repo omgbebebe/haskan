@@ -4,7 +4,6 @@ module Graphics.Haskan.Vulkan.Render where
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Traversable (for)
 import Data.Foldable (for_)
-import qualified Foreign
 import qualified Foreign.Marshal.Array
 
 -- vulkan-api
@@ -17,21 +16,14 @@ import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 -- managed
 import Control.Monad.Managed (MonadManaged)
 -- haskan
-import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
 import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
 import qualified Graphics.Haskan.Vulkan.DescriptorSet as DescriptorSet
-import qualified Graphics.Haskan.Vulkan.Device as Device
-import qualified Graphics.Haskan.Vulkan.Fence as Fence
 import qualified Graphics.Haskan.Vulkan.Framebuffer as Framebuffer
 import qualified Graphics.Haskan.Vulkan.GraphicsPipeline as GraphicsPipeline
-import qualified Graphics.Haskan.Vulkan.Instance as Instance
-import qualified Graphics.Haskan.Vulkan.PipelineLayout as PipelineLayout
 import qualified Graphics.Haskan.Vulkan.PhysicalDevice as PhysicalDevice
 import qualified Graphics.Haskan.Vulkan.RenderPass as RenderPass
-import qualified Graphics.Haskan.Vulkan.Semaphore as Semaphore
-import qualified Graphics.Haskan.Vulkan.ShaderModule as ShaderModule
 import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
-import Graphics.Haskan.Resources (throwVkResult, allocaAndPeek, allocaAndPeekVkResult)
+import Graphics.Haskan.Resources (throwVkResult, allocaAndPeekVkResult)
 
 maxFramesInFlight :: Int
 maxFramesInFlight = 2
@@ -80,22 +72,25 @@ createRenderContext pdev device surface pipelineLayout vertShader fragShader des
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
   -- TODO: embed imageViews somewhere
   images <- Swapchain.getSwapchainImages device swapchain
+  depthImage <- Swapchain.managedDepthImage pdev device surfaceExtent
   imageViews <- for images (Swapchain.managedImageView device Swapchain.surfaceFormat)
+  depthImageView <- Swapchain.managedDepthView device depthImage
+
   renderPass <- RenderPass.managedRenderPass device Swapchain.surfaceFormat
   graphicsPipeline <-
     GraphicsPipeline.managedGraphicsPipeline
       device
-      Swapchain.surfaceFormat
       pipelineLayout
       renderPass
       vertShader
       fragShader
       surfaceExtent
-  framebuffers <- for imageViews (Framebuffer.managedFramebuffer device renderPass surfaceExtent)
+  framebuffers <- for imageViews $ \imageView ->
+    Framebuffer.managedFramebuffer device renderPass surfaceExtent imageView depthImageView
 
   graphicsCommandBuffers <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device graphicsCommandPool)
  
-  for (zip3 framebuffers graphicsCommandBuffers descriptorSets)
+  for_ (zip3 framebuffers graphicsCommandBuffers descriptorSets)
     (\(fb, cb, ds) -> CommandBuffer.withCommandBuffer cb
       (RenderPass.withRenderPass cb renderPass fb surfaceExtent $ do
        GraphicsPipeline.cmdBindPipeline cb graphicsPipeline
@@ -138,7 +133,14 @@ drawFrame ctx@RenderContext{..} imageAvailableSemaphore fenceIndex = do
     Vulkan.VK_ERROR_OUT_OF_DATE_KHR -> pure FrameOutOfDate
     _ -> pure $ FrameFailed (show vkResult)
 
-renderImage ctx@RenderContext{..} imageAvailableSemaphore fenceIndex imageIndex = do
+renderImage
+  :: MonadIO m
+  => RenderContext
+  -> Vulkan.VkSemaphore
+  -> Int
+  -> Vulkan.Word32
+  -> m Vulkan.Word32
+renderImage RenderContext{..} imageAvailableSemaphore fenceIndex imageIndex = do
   let
     commandBuffer = graphicsCommandBuffers !! (fromIntegral imageIndex)
     renderFinishedSemaphore = renderFinishedSemaphores !! (fromIntegral imageIndex)
@@ -162,7 +164,7 @@ renderImage ctx@RenderContext{..} imageAvailableSemaphore fenceIndex imageIndex 
   pure (imageIndex)
 
 presentFrame :: MonadIO m => RenderContext -> Vulkan.Word32 -> Vulkan.VkSemaphore -> m ()
-presentFrame ctx@RenderContext{..} imageIndex renderFinishedSem = do
+presentFrame RenderContext{..} imageIndex renderFinishedSem = do
   let
     presentInfo = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR
@@ -175,5 +177,5 @@ presentFrame ctx@RenderContext{..} imageIndex renderFinishedSem = do
       &* set @"pResults" Vulkan.vkNullPtr
       )
   liftIO $ do
-    Vulkan.vkQueuePresentKHR presentQueueHandler (Vulkan.unsafePtr presentInfo)
+    Vulkan.vkQueuePresentKHR presentQueueHandler (Vulkan.unsafePtr presentInfo) >>= throwVkResult
   pure ()

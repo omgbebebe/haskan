@@ -1,25 +1,19 @@
 module Graphics.Haskan.Vulkan.DescriptorSetLayout where
 
 -- base
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Traversable (for)
+import Control.Monad.IO.Class (MonadIO)
 
 -- managed
 import Control.Monad.Managed (MonadManaged)
 
--- pretty-simple
-import Text.Pretty.Simple
-
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
-import qualified Graphics.Vulkan.Ext as Vulkan
-import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
 -- haskan
-import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_, throwVkResult)
+import Graphics.Haskan.Resources (alloc, allocaAndPeek)
 
 managedDescriptorSetLayout :: MonadManaged m => Vulkan.VkDevice -> m Vulkan.VkDescriptorSetLayout
 managedDescriptorSetLayout dev = alloc "DescriptorSetLayout"

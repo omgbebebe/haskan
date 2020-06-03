@@ -65,6 +65,7 @@ library
   build-depends:       base >=4.14 && <4.15
                      , bytestring
                      , clock >=0.8
+                     , lens
                      , linear
                      , managed >=1.0.7
                      , pretty-simple
