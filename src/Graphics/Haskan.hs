@@ -5,11 +5,16 @@ module Graphics.Haskan where
 --import Control.Exception (bracket)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad (replicateM)
+import Data.Foldable (for_)
 import Data.Text (Text)
 import Control.Monad.IO.Class (MonadIO)
+import qualified Foreign.C
 
 -- linear
 import Linear (V2(..), V3(..))
+import Linear.Matrix (M44(..), (!*!))
+import qualified Linear.Matrix
+import qualified Linear.Projection
 
 -- managed
 import Control.Monad.Managed (runManaged)
@@ -17,16 +22,22 @@ import Control.Monad.Managed (runManaged)
 -- sdl2
 import qualified SDL
 
+-- vector
+import qualified Data.Vector as Vector
+
 -- haskan
 --import qualified Graphics.Haskan.Engine as Engine
 import qualified Graphics.Haskan.Events as Events
-import qualified Graphics.Haskan.Vertex (Vertex(..))
+import Graphics.Haskan.Vertex (Vertex)
 
 import Graphics.Haskan.Vulkan.Render (RenderContext(..), drawFrame, presentFrame)
 import qualified Graphics.Haskan.Vulkan.Buffer as Buffer
 import qualified Graphics.Haskan.Vulkan.Render as Render
 --import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
 import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
+import qualified Graphics.Haskan.Vulkan.DescriptorPool as DescriptorPool
+import qualified Graphics.Haskan.Vulkan.DescriptorSet as DescriptorSet
+import qualified Graphics.Haskan.Vulkan.DescriptorSetLayout as DescriptorSetLayout
 --import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
 import qualified Graphics.Haskan.Vulkan.Device as Device
 import qualified Graphics.Haskan.Vulkan.Fence as Fence
@@ -102,7 +113,7 @@ renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
     renderLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores
 
 appLoop
-  :: MonadManaged m
+  :: (MonadFail m, MonadManaged m)
   => Vulkan.VkPtr Vulkan.VkSurfaceKHR_T
   -> Vulkan.Ptr Vulkan.VkPhysicalDevice_T
   -> Vulkan.VkDevice
@@ -114,10 +125,15 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
   graphicsQueueHandler <- Device.getDeviceQueueHandler device graphicsQueueFamilyIndex 0
   presentQueueHandler <- Device.getDeviceQueueHandler device presentQueueFamilyIndex 0
 
-  vertShader <- ShaderModule.managedShaderModule device "data/shaders/buffers/vert.spv"
-  fragShader <- ShaderModule.managedShaderModule device "data/shaders/buffers/frag.spv"
+  vertShader <- ShaderModule.managedShaderModule device "data/shaders/mvp/vert.spv"
+  fragShader <- ShaderModule.managedShaderModule device "data/shaders/mvp/frag.spv"
 
-  pipelineLayout <- PipelineLayout.managedPipelineLayout device
+  descriptorSetLayout <- DescriptorSetLayout.managedDescriptorSetLayout device
+
+  descriptorPool <- DescriptorPool.managedDescriptorPool device 4 -- imageViewCount here
+  descriptorSets <- replicateM 4 (DescriptorSet.allocateDescriptorSet device descriptorPool [descriptorSetLayout])
+
+  pipelineLayout <- PipelineLayout.managedPipelineLayout device [descriptorSetLayout]
   graphicsCommandPool <- CommandPool.managedCommandPool device graphicsQueueFamilyIndex
 --  presentCommandPool <- CommandPool.managedCommandPool device presentQueueFamilyIndex
 --  presentCommandBuffers   <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device presentCommandPool)
@@ -126,14 +142,43 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
   renderFinishedSemaphores <- replicateM 4 (Semaphore.managedSemaphore device)
   renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
+  let
+    zPos = (-5.0)
+    vertices =
+      [V2 (V3   0.5  (-0.5) zPos) (V3 1.0 0.0 0.0)
+      ,V2 (V3   0.5  ( 0.5) zPos) (V3 0.0 1.0 0.0)
+      ,V2 (V3 (-0.5) ( 0.5) zPos) (V3 1.0 1.0 0.0)
+      ]
+
   vertexBuffer <-
     Buffer.managedVertexBuffer
     physicalDevice
     device
-    [V2 (V3   0.5  (-0.5) 0.0) (V3 1.0 0.0 0.0)
-    ,V2 (V3   0.5  ( 0.5) 0.0) (V3 0.0 1.0 0.0)
-    ,V2 (V3 (-0.5) ( 0.5) 0.0) (V3 1.0 1.0 0.0)
-    ]
+    vertices
+
+  mvpBuffer <-
+    let
+      view =
+        Linear.Matrix.identity
+      model =
+        Linear.Matrix.identity
+      projection =
+        Linear.Projection.perspective
+        (pi / 6) -- FOV
+        (16/9) -- aspect ratio
+        0.1 -- near plane
+        100.0 -- far plane
+
+      modelViewProjection :: M44 Foreign.C.CFloat
+      modelViewProjection =
+        Linear.Matrix.transpose (projection !*! view !*! model)
+    in Buffer.managedUniformBuffer
+       physicalDevice
+       device
+       [ modelViewProjection ]
+
+
+  for_ descriptorSets $ \descriptorSet -> DescriptorSet.updateDescriptorSets device descriptorSet mvpBuffer
   --indexBuffer <- Buffer.managedIndexBuffer physicalDevice device
 
   let
@@ -144,6 +189,7 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
       pipelineLayout
       vertShader
       fragShader
+      descriptorSets
       graphicsCommandPool
       graphicsQueueHandler
       presentQueueHandler

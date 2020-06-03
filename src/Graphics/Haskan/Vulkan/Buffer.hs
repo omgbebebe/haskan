@@ -9,6 +9,7 @@ import qualified Foreign.Marshal
 import qualified Foreign.Ptr
 import Foreign.Storable (Storable)
 import qualified Foreign.Storable
+
 -- managed
 import Control.Monad.Managed (MonadManaged, with)
 
@@ -51,7 +52,7 @@ createBuffer
   -> m (Vulkan.VkBuffer, Vulkan.VkMemoryRequirements)
 createBuffer pdev dev data' usage = do
   let
-    size = fromIntegral ((length data') * Foreign.sizeOf ( undefined :: Vertex))
+    size = fromIntegral ((length data') * (Foreign.sizeOf (head data')))
     createInfo = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO
       &* set @"pNext" Vulkan.VK_NULL
@@ -102,7 +103,7 @@ bindBufferMemory
   -> m ()
 bindBufferMemory dev buffer memory data' = do
   let
-    size = fromIntegral ((length data') * Foreign.sizeOf ( undefined :: Vertex))
+    size = fromIntegral ((length data') * (Foreign.sizeOf (head data')))
   liftIO $ do
     putStrLn "bind memory"
     Vulkan.vkBindBufferMemory dev buffer memory 0 {- offset-} >>= throwVkResult
@@ -112,11 +113,18 @@ bindBufferMemory dev buffer memory data' = do
     Vulkan.vkUnmapMemory dev memory
     putStrLn "end bind memory"
 
-managedVertexBuffer :: MonadManaged m => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [Vertex] -> m Vulkan.VkBuffer
+managedVertexBuffer :: (MonadManaged m) => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [Vertex] -> m Vulkan.VkBuffer
 managedVertexBuffer pdev dev vertices = do
   (buffer, memoryRequirements) <- managedBuffer pdev dev vertices Vulkan.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
   memory <- managedBufferMemory pdev dev memoryRequirements
   bindBufferMemory dev buffer memory vertices
+  pure buffer
+
+managedUniformBuffer :: (MonadManaged m, Storable a) => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [a] -> m Vulkan.VkBuffer
+managedUniformBuffer pdev dev values = do
+  (buffer, memoryRequirements) <- managedBuffer pdev dev values Vulkan.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
+  memory <- managedBufferMemory pdev dev memoryRequirements
+  bindBufferMemory dev buffer memory values
   pure buffer
 
 --managedIndexBuffer :: MonadManaged m => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> m Vulkan.VkBuffer

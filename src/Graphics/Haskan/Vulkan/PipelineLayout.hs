@@ -21,20 +21,20 @@ import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
 -- haskan
 import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_)
 
-managedPipelineLayout :: MonadManaged m => Vulkan.VkDevice -> m Vulkan.VkPipelineLayout
-managedPipelineLayout dev = alloc "PipelineLayout"
-  (createPipelineLayout dev)
+managedPipelineLayout :: MonadManaged m => Vulkan.VkDevice -> [Vulkan.VkDescriptorSetLayout] -> m Vulkan.VkPipelineLayout
+managedPipelineLayout dev descriptorSetLayouts = alloc "PipelineLayout"
+  (createPipelineLayout dev descriptorSetLayouts)
   (\ptr -> Vulkan.vkDestroyPipelineLayout dev ptr Vulkan.vkNullPtr)
 
-createPipelineLayout :: MonadIO m => Vulkan.VkDevice -> m Vulkan.VkPipelineLayout
-createPipelineLayout dev =
+createPipelineLayout :: MonadIO m => Vulkan.VkDevice -> [Vulkan.VkDescriptorSetLayout] -> m Vulkan.VkPipelineLayout
+createPipelineLayout dev descriptorSetLayouts =
   let
     createInfo = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
       &* set @"pNext" Vulkan.VK_NULL
       &* set @"flags" Vulkan.VK_ZERO_FLAGS
-      &* set @"setLayoutCount" 0
-      &* set @"pSetLayouts" Vulkan.VK_NULL
+      &* set @"setLayoutCount" (fromIntegral (length descriptorSetLayouts))
+      &* setListRef @"pSetLayouts" descriptorSetLayouts
       &* set @"pushConstantRangeCount" 0
       &* set @"pPushConstantRanges" Vulkan.VK_NULL
       )

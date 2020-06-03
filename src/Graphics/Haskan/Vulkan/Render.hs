@@ -18,6 +18,7 @@ import Control.Monad.Managed (MonadManaged)
 -- haskan
 import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
 import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
+import qualified Graphics.Haskan.Vulkan.DescriptorSet as DescriptorSet
 import qualified Graphics.Haskan.Vulkan.Device as Device
 import qualified Graphics.Haskan.Vulkan.Fence as Fence
 import qualified Graphics.Haskan.Vulkan.Framebuffer as Framebuffer
@@ -63,6 +64,7 @@ createRenderContext
   -> Vulkan.VkPipelineLayout
   -> Vulkan.VkShaderModule
   -> Vulkan.VkShaderModule
+  -> [Vulkan.VkDescriptorSet]
   -> Vulkan.VkCommandPool
   -> Vulkan.VkQueue
   -> Vulkan.VkQueue
@@ -70,7 +72,7 @@ createRenderContext
   -> [Vulkan.VkSemaphore]
   -> [Vulkan.VkBuffer]
   -> m RenderContext
-createRenderContext pdev device surface pipelineLayout vertShader fragShader graphicsCommandPool
+createRenderContext pdev device surface pipelineLayout vertShader fragShader descriptorSets graphicsCommandPool
                     graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores bindBuffers = do
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
@@ -91,10 +93,20 @@ createRenderContext pdev device surface pipelineLayout vertShader fragShader gra
 
   graphicsCommandBuffers <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device graphicsCommandPool)
  
-  for (zip framebuffers graphicsCommandBuffers)
-    (\(fb, cb) -> CommandBuffer.withCommandBuffer cb
+  for (zip3 framebuffers graphicsCommandBuffers descriptorSets)
+    (\(fb, cb, ds) -> CommandBuffer.withCommandBuffer cb
       (RenderPass.withRenderPass cb renderPass fb surfaceExtent $ do
        GraphicsPipeline.cmdBindPipeline cb graphicsPipeline
+       liftIO $ Foreign.Marshal.Array.withArray [ ds ] $ \dsPtr ->
+         DescriptorSet.cmdBindDescriptorSets
+           cb
+           Vulkan.VK_PIPELINE_BIND_POINT_GRAPHICS
+           pipelineLayout
+           0
+           1
+           dsPtr
+           0
+           Vulkan.vkNullPtr
      
        liftIO $ Foreign.Marshal.Array.withArray bindBuffers $ \buffers ->
          Foreign.Marshal.Array.withArray [ 0 ] $ \offsets ->

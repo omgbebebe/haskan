@@ -2,8 +2,9 @@ module Graphics.Haskan.Vertex where
 
 -- base
 import Data.Word (Word8)
+import qualified Foreign
 import qualified Foreign.C
-
+import Foreign.Storable (Storable(..))
 -- linear
 import Linear (V2(..), V3(..), V4(..))
 
@@ -11,8 +12,11 @@ import Linear (V2(..), V3(..), V4(..))
 import Graphics.Haskan.Vulkan.VertexFormat
 
 type Vertex = V2 (V3 Foreign.C.CFloat)
-
 {-
+data Vertex = Vertex{ vPos :: V3 Foreign.C.CFloat
+                    , vCol :: V3 Foreign.C.CFloat
+                    } deriving (Eq, Show)
+
 data Vertex = Vertex
   { vPos :: V3 Foreign.C.CFloat
   , vColor :: V4 Word8
