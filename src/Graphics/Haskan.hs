@@ -192,8 +192,8 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
         Linear.Projection.perspective
         (pi / 6) -- FOV
         (16/9) -- aspect ratio
-        0.1 -- near plane
-        100.0 -- far plane
+        0.0 -- near plane
+        1.0 -- far plane
 
       modelViewProjection :: M44 Foreign.C.CFloat
       modelViewProjection =

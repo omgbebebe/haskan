@@ -167,7 +167,8 @@ createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExte
          &* set @"flags" Vulkan.VK_ZERO_FLAGS
          &* set @"depthTestEnable" Vulkan.VK_TRUE
          &* set @"depthWriteEnable" Vulkan.VK_TRUE
-         &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_LESS_OR_EQUAL
+         -- &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_LESS_OR_EQUAL
+         &* set @"depthCompareOp" Vulkan.VK_COMPARE_OP_GREATER
          &* set @"depthBoundsTestEnable" Vulkan.VK_FALSE
          &* set @"stencilTestEnable" Vulkan.VK_FALSE
          &* set @"front" nullStencilOp
