@@ -68,7 +68,7 @@ createRenderContext
   -> m RenderContext
 createRenderContext pdev device surface pipelineLayout vertShader fragShader descriptorSets graphicsCommandPool
                     graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores vertexBuffers indexBuffers = do
-  let depthFormat = Vulkan.VK_FORMAT_D16_UNORM
+  let depthFormat = Vulkan.VK_FORMAT_D32_SFLOAT
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
   -- TODO: embed imageViews somewhere
