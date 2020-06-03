@@ -52,4 +52,4 @@ withCommandBuffer commandBuffer action =
   in (begin *> action <* end)
 
 cmdDraw :: MonadIO m => Vulkan.VkCommandBuffer -> m ()
-cmdDraw commandBuffer = liftIO $ Vulkan.vkCmdDraw commandBuffer 3 1 0 0
+cmdDraw commandBuffer = liftIO $ Vulkan.vkCmdDrawIndexed commandBuffer 6 1 0 0 0

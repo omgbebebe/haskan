@@ -10,6 +10,9 @@ import Data.Text (Text)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Foreign.C
 
+-- clock
+--import qualified System.Clock
+
 -- linear
 import Linear (V2(..), V3(..))
 import Linear.Matrix (M44(..), (!*!))
@@ -143,12 +146,16 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
   renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
   let
-    zPos = (-5.0)
+    zPos = (5.0)
     vertices =
-      [V2 (V3   0.5  (-0.5) zPos) (V3 1.0 0.0 0.0)
-      ,V2 (V3   0.5  ( 0.5) zPos) (V3 0.0 1.0 0.0)
-      ,V2 (V3 (-0.5) ( 0.5) zPos) (V3 1.0 1.0 0.0)
+      [V2 (V3 (-1.0) ( 1.0) zPos) (V3 1.0 0.0 0.0)
+      ,V2 (V3 (-1.0) (-1.0) zPos) (V3 0.0 1.0 0.0)
+      ,V2 (V3 ( 1.0) (-1.0) zPos) (V3 1.0 1.0 0.0)
+      ,V2 (V3 ( 1.0) ( 1.0) zPos) (V3 1.0 1.0 1.0)
       ]
+    indices = [ 0, 1, 2
+              , 2, 3, 0
+              ]
 
   vertexBuffer <-
     Buffer.managedVertexBuffer
@@ -156,10 +163,17 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
     device
     vertices
 
+  indexBuffer <-
+    Buffer.managedIndexBuffer
+    physicalDevice
+    device
+    indices
+
+
   mvpBuffer <-
     let
       view =
-        Linear.Matrix.identity
+        Linear.Projection.lookAt (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0) (V3 0.0 (-1.0) 0.0)
       model =
         Linear.Matrix.identity
       projection =
@@ -196,6 +210,7 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
       renderFinishedFences
       renderFinishedSemaphores
       [vertexBuffer]
+      [indexBuffer]
 
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
   let

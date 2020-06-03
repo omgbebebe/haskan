@@ -3,6 +3,7 @@ module Graphics.Haskan.Vulkan.Render where
 -- base
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Traversable (for)
+import Data.Foldable (for_)
 import qualified Foreign
 import qualified Foreign.Marshal.Array
 
@@ -71,9 +72,10 @@ createRenderContext
   -> [Vulkan.VkFence]
   -> [Vulkan.VkSemaphore]
   -> [Vulkan.VkBuffer]
+  -> [Vulkan.VkBuffer]
   -> m RenderContext
 createRenderContext pdev device surface pipelineLayout vertShader fragShader descriptorSets graphicsCommandPool
-                    graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores bindBuffers = do
+                    graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores vertexBuffers indexBuffers = do
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
   -- TODO: embed imageViews somewhere
@@ -108,9 +110,12 @@ createRenderContext pdev device surface pipelineLayout vertShader fragShader des
            0
            Vulkan.vkNullPtr
      
-       liftIO $ Foreign.Marshal.Array.withArray bindBuffers $ \buffers ->
-         Foreign.Marshal.Array.withArray [ 0 ] $ \offsets ->
-           Vulkan.vkCmdBindVertexBuffers cb 0 1 buffers offsets
+       liftIO $ Foreign.Marshal.Array.withArray vertexBuffers $ \bufferPtr ->
+         Foreign.Marshal.Array.withArray [ 0 ] $ \offsetPtr ->
+           Vulkan.vkCmdBindVertexBuffers cb 0 1 bufferPtr offsetPtr
+
+       for_ indexBuffers $ \indexBuffer -> liftIO $
+         Vulkan.vkCmdBindIndexBuffer cb indexBuffer 0 Vulkan.VK_INDEX_TYPE_UINT32
 
        CommandBuffer.cmdDraw cb
       )

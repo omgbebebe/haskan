@@ -28,7 +28,7 @@ import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
 import Text.Pretty.Simple
 
 -- haskan
-import Graphics.Haskan.Vertex (Vertex)
+import Graphics.Haskan.Vertex (Vertex, VertexIndex)
 import qualified Graphics.Haskan.Vulkan.Memory as Memory
 import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_, throwVkResult)
 
@@ -118,6 +118,13 @@ managedVertexBuffer pdev dev vertices = do
   (buffer, memoryRequirements) <- managedBuffer pdev dev vertices Vulkan.VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
   memory <- managedBufferMemory pdev dev memoryRequirements
   bindBufferMemory dev buffer memory vertices
+  pure buffer
+
+managedIndexBuffer :: (MonadManaged m) => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [VertexIndex] -> m Vulkan.VkBuffer
+managedIndexBuffer pdev dev indices = do
+  (buffer, memoryRequirements) <- managedBuffer pdev dev indices Vulkan.VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+  memory <- managedBufferMemory pdev dev memoryRequirements
+  bindBufferMemory dev buffer memory indices
   pure buffer
 
 managedUniformBuffer :: (MonadManaged m, Storable a) => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [a] -> m Vulkan.VkBuffer
