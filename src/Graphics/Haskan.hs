@@ -1,14 +1,16 @@
 module Graphics.Haskan where
 
 -- base
---import Control.Concurrent (threadDelay)
+import Control.Concurrent (threadDelay)
 --import Control.Exception (bracket)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad (replicateM)
 import Data.Foldable (for_)
 import Data.Text (Text)
+import Data.Traversable (for)
 import Control.Monad.IO.Class (MonadIO)
 import qualified Foreign.C
+import qualified Foreign.Marshal.Array
 
 -- clock
 --import qualified System.Clock
@@ -57,8 +59,10 @@ import qualified Graphics.Haskan.Window as Window
 
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
- 
+import qualified Graphics.Vulkan.Ext as Vulkan
+
 import Control.Monad.Managed (MonadManaged, with)
+import Graphics.Haskan.Resources (throwVkResult)
  
 data QueueFamily
   = Graphics
@@ -98,21 +102,33 @@ renderLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores = do
     res <- liftIO $ drawFrame ctx imageAvailableSemaphore frameNumber
     case res of
       Render.FrameOk imageIndex -> do
-        liftIO $ presentFrame ctx imageIndex (renderFinishedSemaphores !! (fromIntegral imageIndex))
-        pure False
-      Render.FrameSuboptimal _ -> fail "suboptimal"
+        presentResult <- liftIO $ presentFrame ctx imageIndex (renderFinishedSemaphores !! (fromIntegral imageIndex))
+        case presentResult of
+          Vulkan.VK_SUCCESS -> pure False
+          Vulkan.VK_SUBOPTIMAL_KHR -> pure True
+          Vulkan.VK_ERROR_OUT_OF_DATE_KHR -> pure True
+          _ -> fail "presentFrame failed"
+      Render.FrameSuboptimal _ -> do
+        fail "suboptimal"
       Render.FrameOutOfDate -> do
         liftIO $ putStrLn "resizing swapchain"
         pure True
       Render.FrameFailed err -> fail err
  
   if (qPressed || needRestart)
-  then do
-    _ <- liftIO $ Vulkan.vkDeviceWaitIdle device
-    liftIO $ putStrLn "===================== end renderLoop"
+  then liftIO $ do
+    Vulkan.vkDeviceWaitIdle device >>= throwVkResult
+--    putStrLn "===================== waiting fences"
+--    Foreign.Marshal.Array.withArray renderFinishedFences $ \ptr -> do
+--      Vulkan.vkWaitForFences device 1 ptr Vulkan.VK_TRUE maxBound >>= throwVkResult
+--      Vulkan.vkResetFences device 1 ptr >>= throwVkResult
+
+--    Vulkan.vkQueueWaitIdle graphicsQueueHandler >>= throwVkResult
+--    Vulkan.vkQueueWaitIdle presentQueueHandler >>= throwVkResult
+--    putStrLn "===================== end renderLoop"
     pure qPressed
   else do
-    --SDL.delay 200
+--    SDL.delay 200
     renderLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores
 
 appLoop
@@ -147,8 +163,8 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
 
   let
     zPos1 = ( 5)
-    zPos2 = ( 1)
-    zPos3 = ( 3)
+    zPos2 = ( 3)
+    zPos3 = ( 1)
     vertices =
       [V2 (V3 (-1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) -- 0
       ,V2 (V3 (-1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) -- 1

@@ -73,9 +73,7 @@ createRenderContext pdev device surface pipelineLayout vertShader fragShader des
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
   -- TODO: embed imageViews somewhere
   images <- Swapchain.getSwapchainImages device swapchain
-  depthImage <- Swapchain.managedDepthImage pdev device surfaceExtent depthFormat
   imageViews <- for images (Swapchain.managedImageView device Swapchain.surfaceFormat)
-  depthImageView <- Swapchain.managedDepthView device depthImage depthFormat
 
   renderPass <- RenderPass.managedRenderPass device Swapchain.surfaceFormat depthFormat
   graphicsPipeline <-
@@ -86,8 +84,13 @@ createRenderContext pdev device surface pipelineLayout vertShader fragShader des
       vertShader
       fragShader
       surfaceExtent
+
+  depthImage <- Swapchain.managedDepthImage pdev device surfaceExtent depthFormat
+  depthImageView <- Swapchain.managedDepthView device depthImage depthFormat
+ 
   framebuffers <- for imageViews $ \imageView ->
     Framebuffer.managedFramebuffer device renderPass surfaceExtent imageView depthImageView
+
 
   graphicsCommandBuffers <- for framebuffers (\_ -> CommandBuffer.createCommandBuffer device graphicsCommandPool)
  
@@ -164,7 +167,7 @@ renderImage RenderContext{..} imageAvailableSemaphore fenceIndex imageIndex = do
     Vulkan.vkQueueSubmit graphicsQueueHandler 1 (Vulkan.unsafePtr submitInfo) renderFinishedFence >>= throwVkResult
   pure (imageIndex)
 
-presentFrame :: MonadIO m => RenderContext -> Vulkan.Word32 -> Vulkan.VkSemaphore -> m ()
+presentFrame :: MonadIO m => RenderContext -> Vulkan.Word32 -> Vulkan.VkSemaphore -> m Vulkan.VkResult
 presentFrame RenderContext{..} imageIndex renderFinishedSem = do
   let
     presentInfo = Vulkan.createVk
@@ -177,6 +180,4 @@ presentFrame RenderContext{..} imageIndex renderFinishedSem = do
       &* setListRef @"pImageIndices" [imageIndex]
       &* set @"pResults" Vulkan.vkNullPtr
       )
-  liftIO $ do
-    Vulkan.vkQueuePresentKHR presentQueueHandler (Vulkan.unsafePtr presentInfo) >>= throwVkResult
-  pure ()
+  liftIO $ Vulkan.vkQueuePresentKHR presentQueueHandler (Vulkan.unsafePtr presentInfo)
