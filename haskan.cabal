@@ -63,6 +63,7 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
   build-depends:       base >=4.14 && <4.15
+                     , async >=2.2.2
                      , bytestring
                      , clock >=0.8
                      , lens
@@ -71,6 +72,7 @@ library
                      , pretty-simple
                      , say
                      , sdl2 >=2.5.2
+                     , stm >=2.5
                      , text
                      , vector
                      , vulkan-api >=1.3.0

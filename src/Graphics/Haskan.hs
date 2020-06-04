@@ -34,6 +34,7 @@ import qualified SDL
 -- haskan
 --import qualified Graphics.Haskan.Engine as Engine
 import qualified Graphics.Haskan.Events as Events
+import qualified Graphics.Haskan.Engine as Engine
 
 import Graphics.Haskan.Vulkan.Render (RenderContext(..), drawFrame, presentFrame)
 import qualified Graphics.Haskan.Vulkan.Buffer as Buffer
@@ -140,6 +141,7 @@ appLoop
   -> Int
   -> m ()
 appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex = do
+  {-
   liftIO $ putStrLn "starting render loop"
   graphicsQueueHandler <- Device.getDeviceQueueHandler device graphicsQueueFamilyIndex 0
   presentQueueHandler <- Device.getDeviceQueueHandler device presentQueueFamilyIndex 0
@@ -257,8 +259,12 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
       if exit
       then pure ()
       else do
-        qPressed <- liftIO $ with mkRenderContext $ \context -> renderLoop context 0 imageAvailableSemaphores
+        -- qPressed <- liftIO $ with mkRenderContext $ \context -> renderLoop context 0 imageAvailableSemaphores
+        qPressed <- liftIO $ with mkRenderContext $ \context -> Engine.mainLoop (Engine.HaskanConfig 60 120 10) context
         loop qPressed
 
   loop False
+  pure ()
+-}
+  Engine.mainLoop (Engine.HaskanConfig 60 120 10)
   pure ()
