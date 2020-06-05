@@ -116,12 +116,26 @@ managedIndexBuffer pdev dev indices = do
   bindBufferMemory dev buffer memory indices
   pure buffer
 
-managedUniformBuffer :: (MonadManaged m, Storable a) => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [a] -> m Vulkan.VkBuffer
+managedUniformBuffer
+  :: (MonadManaged m, Storable a)
+  => Vulkan.VkPhysicalDevice
+  -> Vulkan.VkDevice
+  -> [a]
+  -> m (Vulkan.VkBuffer, Vulkan.VkDeviceMemory)
 managedUniformBuffer pdev dev values = do
   (buffer, memoryRequirements) <- managedBuffer dev values Vulkan.VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT
   memory <- managedBufferMemory pdev dev memoryRequirements
   bindBufferMemory dev buffer memory values
-  pure buffer
+  pure (buffer, memory)
 
+updateUniformBuffer :: (MonadIO m, Storable a) => Vulkan.VkDevice -> Vulkan.VkDeviceMemory -> a -> m ()
+updateUniformBuffer dev memory uniformData = do
+  let
+    size = fromIntegral (Foreign.sizeOf uniformData)
+  memPtr <-
+    allocaAndPeek (Vulkan.vkMapMemory dev memory 0 size Vulkan.VK_ZERO_FLAGS)
+  liftIO $ do
+    Foreign.poke (Foreign.castPtr memPtr) uniformData
+    Vulkan.vkUnmapMemory dev memory
 --managedIndexBuffer :: MonadManaged m => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> m Vulkan.VkBuffer
 --managedIndexBuffer pdev dev = managedBuffer pdev dev [] Vulkan.VK_BUFFER_USAGE_INDEX_BUFFER_BIT

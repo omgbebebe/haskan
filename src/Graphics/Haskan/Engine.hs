@@ -5,6 +5,7 @@ import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar, putMVar)
 import Control.Monad (when, replicateM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.Text (Text)
 import qualified Foreign.C
@@ -138,13 +139,24 @@ mainLoop EngineConfig{..} = do
 -}
   logI "mainLoop finished"
 
-renderFrameLoop :: (MonadFail m, MonadIO m) => RenderContext -> Int -> [Vulkan.VkSemaphore] -> TChan ControlMessage -> m Bool
-renderFrameLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores control = do
+renderFrameLoop
+  :: (MonadFail m, MonadIO m)
+  => RenderContext
+  -> Int
+  -> [Vulkan.VkSemaphore]
+  -> TChan ControlMessage
+  -> Vulkan.VkDeviceMemory
+  -> TVar Camera
+  -> m Bool
+renderFrameLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores control mvpMemory tvCamera = do
   _events <- SDL.pollEvents
   maybeControlMessage <- liftIO $ STM.atomically $ TChan.tryReadTChan control
   (needRestart, terminating) <- case maybeControlMessage of
     Nothing -> do
       let imageAvailableSemaphore = imageAvailableSemaphores !! (frameNumber)
+      camera <- liftIO $ STM.readTVarIO tvCamera
+      let newMVP = mvpMatrix (coerce (camPos camera)) (coerce (camLookAt camera))
+      Buffer.updateUniformBuffer device mvpMemory newMVP
       res <- liftIO $ drawFrame ctx imageAvailableSemaphore frameNumber
       case res of
         Render.FrameOk imageIndex -> do
@@ -170,11 +182,11 @@ renderFrameLoop ctx@RenderContext{..} frameNumber imageAvailableSemaphores contr
       Vulkan.vkDeviceWaitIdle device >>= throwVkResult
       logI "terminating renderFrameLoop"
       pure terminating
-    else renderFrameLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores control
+    else renderFrameLoop ctx ((frameNumber + 1) `mod` Render.maxFramesInFlight) imageAvailableSemaphores control mvpMemory tvCamera
 
 --renderLoop :: MonadIO m => Integer -> RenderContext -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
 renderLoop :: MonadManaged m => Text -> Integer -> GameState -> MVar () -> TChan ControlMessage -> m ()
-renderLoop title _targetFPS _gameState finishedSemaphore controlChannel = do
+renderLoop title _targetFPS gameState finishedSemaphore controlChannel = do
   control <- liftIO $ STM.atomically $ TChan.dupTChan controlChannel
   logI "Initializing events managed"
   Events.managedEvents
@@ -252,30 +264,11 @@ renderLoop title _targetFPS _gameState finishedSemaphore controlChannel = do
     indices
 
 
-  mvpBuffer <-
-    let
-      view =
-        Linear.Projection.lookAt (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0) (V3 0.0 (-1.0) 0.0)
-      model =
-        let
-          rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
-          translate = identity & translation .~ V3 0 0 (5.0)
-        in translate !*! rotate
-      projection =
-        Linear.Projection.perspective
-        (pi / 6) -- FOV
-        (16/9) -- aspect ratio
-        0.01 -- near plane
-        100.0 -- far plane
-
-      modelViewProjection :: M44 Foreign.C.CFloat
-      modelViewProjection =
-        Linear.Matrix.transpose (projection !*! view !*! model)
-        --(projection !*! view !*! model)
-    in Buffer.managedUniformBuffer
+  (mvpBuffer, mvpMemory) <-
+    Buffer.managedUniformBuffer
        physicalDevice
        device
-       [ modelViewProjection ]
+       [ mvpMatrix (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0)]
 
 
   for_ descriptorSets $ \descriptorSet -> DescriptorSet.updateDescriptorSets device descriptorSet mvpBuffer
@@ -298,13 +291,16 @@ renderLoop title _targetFPS _gameState finishedSemaphore controlChannel = do
       [indexBuffer]
 
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
+  worldState <- liftIO $ STM.readTVarIO (world gameState)
   let
+    tvCamera = activeCamera worldState
     outerLoop :: (MonadFail m, MonadIO m) => Bool -> m ()
     outerLoop exit = do
       if exit
       then pure ()
       else do
-        renderFrameLoopFinished <- liftIO $ with mkRenderContext $ \context -> renderFrameLoop context 0 imageAvailableSemaphores control
+        renderFrameLoopFinished <- liftIO $ with mkRenderContext $ \context ->
+          renderFrameLoop context 0 imageAvailableSemaphores control mvpMemory tvCamera
         outerLoop renderFrameLoopFinished
 
   logI "Starting render loop"
@@ -313,8 +309,25 @@ renderLoop title _targetFPS _gameState finishedSemaphore controlChannel = do
   logI "renderLoop finished"
   liftIO $ putMVar finishedSemaphore ()
 
+mvpMatrix :: V3 Foreign.C.CFloat -> V3 Foreign.C.CFloat -> M44 Foreign.C.CFloat
+mvpMatrix eyePos target =
+  let
+    view =
+      Linear.Projection.lookAt eyePos target (V3 0.0 (-1.0) 0.0)
+    model =
+      let
+        rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
+        translate = identity & translation .~ V3 0 0 (5.0)
+      in translate !*! rotate
+    projection =
+      Linear.Projection.perspective
+      (pi / 6) -- FOV
+      (16/9) -- aspect ratio
+      0.01 -- near plane
+      100.0 -- far plane
 
---physicsLoop :: MonadIO m => Integer -> RenderContext -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
+  in Linear.Matrix.transpose (projection !*! view !*! model)
+
 physicsLoop :: MonadIO m => Integer -> GameState -> MVar () -> TChan ControlMessage -> m ()
 physicsLoop targetFPS gameState finishedSemaphore controlChannel = liftIO $ do
   control <- STM.atomically $ TChan.dupTChan controlChannel
