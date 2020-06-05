@@ -34,6 +34,7 @@ import qualified SDL
 -- haskan
 --import qualified Graphics.Haskan.Engine as Engine
 import qualified Graphics.Haskan.Events as Events
+import Graphics.Haskan.Engine (EngineConfig(..))
 import qualified Graphics.Haskan.Engine as Engine
 
 import Graphics.Haskan.Vulkan.Render (RenderContext(..), drawFrame, presentFrame)
@@ -87,10 +88,14 @@ runHaskan title = runManaged $ do
   Window.showWindow window
   (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
   logI "Starting Engine main loop"
-  {-
-  Engine.mailLoop
-    (StaticRenderContext surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex)
--}
+  Engine.mainLoop $
+    EngineConfig{ targetRenderFPS = 60
+                , targetPhysicsFPS = 30
+                , targetNetworkFPS = 10
+                , staticRenderContext =
+                    (StaticRenderContext surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex)
+                }
+  logI "Haskan finished"
 
 {-
   appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex

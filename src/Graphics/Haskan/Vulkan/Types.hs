@@ -10,7 +10,7 @@ data StaticRenderContext
                         , device :: Vulkan.VkDevice
                         , graphicsQueueFamilyIndex :: QueueFamilyIndex
                         , presentQueueFamilyIndex :: QueueFamilyIndex
-                        }
+                        } deriving Show
 
 data RenderContext
   = RenderContext { device :: Vulkan.VkDevice
@@ -20,9 +20,9 @@ data RenderContext
                   , presentQueueHandler :: Vulkan.VkQueue
                   , renderFinishedFences :: [Vulkan.VkFence]
                   , renderFinishedSemaphores :: [Vulkan.VkSemaphore]
-                  }
+                  } deriving Show
 
-type QueueFamilyIndex = Vulkan.Word32
+type QueueFamilyIndex = Int
 type ImageIndex = Vulkan.Word32
 
 data RenderResult

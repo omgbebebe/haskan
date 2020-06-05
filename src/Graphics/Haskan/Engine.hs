@@ -25,13 +25,14 @@ import qualified Control.Concurrent.STM.TChan as TChan
 
 -- haskan
 --import Graphics.Haskan.Events (EventsQueue)
-import Graphics.Haskan.Vulkan.Types (RenderContext)
+import Graphics.Haskan.Vulkan.Types (StaticRenderContext(..), RenderContext)
 import Graphics.Haskan.Logger (logI, showT)
 
-data HaskanConfig =
-  HaskanConfig{ targetRenderFPS :: !Integer
+data EngineConfig =
+  EngineConfig{ targetRenderFPS :: !Integer
               , targetPhysicsFPS :: !Integer
               , targetNetworkFPS :: !Integer
+              , staticRenderContext :: !StaticRenderContext
               }
   deriving (Show)
 
@@ -63,8 +64,8 @@ data ControlMessage
 --mainLoop :: MonadIO m => EventsQueue -> RenderContext -> m ()
 --mainLoop eventsQueue ctx@RenderContext{..} = do
 --mainLoop :: MonadIO m => HaskanConfig -> RenderContext -> m Bool
-mainLoop :: MonadIO m => HaskanConfig -> m Bool
-mainLoop config@HaskanConfig{..} = liftIO $ do
+mainLoop :: MonadIO m => EngineConfig -> m Bool
+mainLoop config@EngineConfig{..} = liftIO $ do
   putStrLn "starting mainLoop"
   camera <- STM.newTVarIO (Camera (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0))
   isRunning <- STM.newTVarIO False
