@@ -3,7 +3,7 @@ module Graphics.Haskan.Engine where
 -- base
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.MVar (MVar, newEmptyMVar, takeMVar, putMVar)
-import Control.Monad (when, replicateM)
+import Control.Monad (when, replicateM, unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
@@ -68,6 +68,7 @@ data EngineConfig =
   EngineConfig{ targetRenderFPS :: !Integer
               , targetPhysicsFPS :: !Integer
               , targetNetworkFPS :: !Integer
+              , targetInputFPS :: !Integer
               , title :: !Text
               }
   deriving (Show)
@@ -119,7 +120,10 @@ mainLoop EngineConfig{..} = do
   physicsLoopFinished <- liftIO $ newEmptyMVar
   _ <- liftIO $ forkIO (physicsLoop targetPhysicsFPS gameState physicsLoopFinished controlChannel)
 
-  liftIO $ Async.forConcurrently_ [renderLoopFinished, physicsLoopFinished] $ \sem -> do
+  inputLoopFinished <- liftIO $ newEmptyMVar
+  _ <- liftIO $ forkIO (runManaged $ inputLoop targetInputFPS inputLoopFinished controlChannel)
+
+  liftIO $ Async.forConcurrently_ [renderLoopFinished, physicsLoopFinished, inputLoopFinished] $ \sem -> do
     takeMVar sem
     logI "sending Terminate message"
     STM.atomically $ TChan.writeTChan controlChannel Terminate
@@ -189,7 +193,6 @@ renderLoop :: MonadManaged m => Text -> Integer -> GameState -> MVar () -> TChan
 renderLoop title _targetFPS gameState finishedSemaphore controlChannel = do
   control <- liftIO $ STM.atomically $ TChan.dupTChan controlChannel
   logI "Initializing events managed"
-  Events.managedEvents
 
   logI "Initialize base Render context"
   let initWidth = 1920
@@ -351,3 +354,33 @@ physicsLoop targetFPS gameState finishedSemaphore controlChannel = liftIO $ do
   logI "physicsLoop finished"
   putMVar finishedSemaphore ()
 
+
+inputLoop :: MonadManaged m => Integer -> MVar () -> TChan ControlMessage -> m ()
+inputLoop targetFPS finishedSemaphore controlChannel = do
+  control <- liftIO $ STM.atomically $ TChan.dupTChan controlChannel
+  Events.managedEvents
+
+  let
+    loop :: MonadIO m => Integer -> m ()
+    loop tFPS = liftIO $ do
+      maybeControlMessage <- STM.atomically $ TChan.tryReadTChan control
+      case maybeControlMessage of
+        Nothing -> do
+          events <- SDL.pollEvents
+          let
+            eventIsQPress event =
+              case SDL.eventPayload event of
+                SDL.KeyboardEvent keyboardEvent ->
+                  SDL.keyboardEventKeyMotion keyboardEvent == SDL.Pressed &&
+                  SDL.keysymKeycode (SDL.keyboardEventKeysym keyboardEvent) == SDL.KeycodeQ
+                _ -> False
+            qPressed = any eventIsQPress events
+          threadDelay (1000)
+          when (qPressed) (logI "Q has been pressed")
+          unless (qPressed) (loop tFPS)
+        Just Terminate -> do
+          logI "terminating input loop by signal"
+
+  loop targetFPS
+  logI "inputLoop finished"
+  liftIO $ putMVar finishedSemaphore ()

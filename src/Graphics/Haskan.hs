@@ -23,6 +23,7 @@ runHaskan title = do
     EngineConfig{ targetRenderFPS = 60
                 , targetPhysicsFPS = 300
                 , targetNetworkFPS = 10
+                , targetInputFPS = 200
                 , title = title
                 }
   logI "Haskan finished"
