@@ -6,7 +6,7 @@ import qualified Graphics.Vulkan as Vulkan
 
 data StaticRenderContext
   = StaticRenderContext { surface :: Vulkan.VkSurfaceKHR
-                        , physicalDedice :: Vulkan.VkPhysicalDevice
+                        , physicalDevice :: Vulkan.VkPhysicalDevice
                         , device :: Vulkan.VkDevice
                         , graphicsQueueFamilyIndex :: QueueFamilyIndex
                         , presentQueueFamilyIndex :: QueueFamilyIndex

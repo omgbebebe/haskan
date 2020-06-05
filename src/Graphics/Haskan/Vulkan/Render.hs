@@ -1,8 +1,10 @@
 module Graphics.Haskan.Vulkan.Render
   (RenderContext(..)
+  ,RenderResult(..)
   , drawFrame
   , presentFrame
   , createRenderContext
+  , maxFramesInFlight
   ) where
 
 -- base
@@ -52,8 +54,21 @@ createRenderContext
   -> [Vulkan.VkBuffer]
   -> [Vulkan.VkBuffer]
   -> m RenderContext
-createRenderContext pdev device surface pipelineLayout vertShader fragShader descriptorSets graphicsCommandPool
-                    graphicsQueueHandler presentQueueHandler renderFinishedFences renderFinishedSemaphores vertexBuffers indexBuffers = do
+createRenderContext
+  pdev
+  device
+  surface
+  pipelineLayout
+  vertShader
+  fragShader
+  descriptorSets
+  graphicsCommandPool
+  graphicsQueueHandler
+  presentQueueHandler
+  renderFinishedFences
+  renderFinishedSemaphores
+  vertexBuffers
+  indexBuffers = do
   let depthFormat = Vulkan.VK_FORMAT_D32_SFLOAT
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
