@@ -24,6 +24,7 @@ import qualified Graphics.Vulkan.Ext as Vulkan
 
 -- haskan
 import Graphics.Haskan.Resources (alloc, alloc_)
+import Graphics.Haskan.Logger (logI, showT)
 
 managedWindow
   :: MonadManaged m
@@ -52,7 +53,7 @@ managedWindow title (width, height) = do
 
   windowExtensions <-
     liftIO $ traverse BS.packCString =<< SDL.Video.Vulkan.vkGetInstanceExtensions window
-  liftIO $ putStrLn $ "Window extensions: " <> show windowExtensions
+  logI ("Window extensions: " <> showT windowExtensions)
   pure (windowExtensions, window)
 
 managedSurface

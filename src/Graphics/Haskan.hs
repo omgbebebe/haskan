@@ -58,23 +58,25 @@ import qualified Graphics.Haskan.Vulkan.ShaderModule as ShaderModule
 --import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
 import qualified Graphics.Haskan.Window as Window
 
-import qualified Graphics.Vulkan as Vulkan
-import qualified Graphics.Vulkan.Core_1_0 as Vulkan
-import qualified Graphics.Vulkan.Ext as Vulkan
-
 import Control.Monad.Managed (MonadManaged, with)
 import Graphics.Haskan.Resources (throwVkResult)
- 
+
+-- haskan
+import Graphics.Haskan.Vulkan.Types (StaticRenderContext(..))
+import Graphics.Haskan.Logger (logI)
+
 data QueueFamily
   = Graphics
   | Compute
   | Transfer
   | Sparse
- 
+
 --init :: MonadIO m => Text -> m ()
-initHaskan :: Text -> IO ()
-initHaskan title = runManaged $ do
+runHaskan :: Text -> IO ()
+runHaskan title = runManaged $ do
+  logI "Initialize Haskan Engine"
   Events.managedEvents
+  logI "Initialize RenderContext"
   let initWidth = 1920
       initHeight = 1080
   (windowExts, window) <- Window.managedWindow title (initWidth, initHeight)
@@ -82,8 +84,15 @@ initHaskan title = runManaged $ do
   surface          <- Window.managedSurface inst window
   physicalDevice   <- PhysicalDevice.selectPhysicalDevice inst
 
-  (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
   Window.showWindow window
+  (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
+  logI "Starting Engine main loop"
+  {-
+  Engine.mailLoop
+    (StaticRenderContext surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex)
+-}
+
+{-
   appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamilyIndex
 
 renderLoop :: (MonadFail m, MonadIO m) => RenderContext -> Int -> [Vulkan.VkSemaphore] -> m Bool
@@ -268,3 +277,4 @@ appLoop surface physicalDevice device graphicsQueueFamilyIndex presentQueueFamil
 -}
   Engine.mainLoop (Engine.HaskanConfig 60 120 10)
   pure ()
+-}

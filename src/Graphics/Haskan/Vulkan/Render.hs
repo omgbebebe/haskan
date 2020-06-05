@@ -1,4 +1,9 @@
-module Graphics.Haskan.Vulkan.Render where
+module Graphics.Haskan.Vulkan.Render
+  (RenderContext(..)
+  , drawFrame
+  , presentFrame
+  , createRenderContext
+  ) where
 
 -- base
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -25,29 +30,10 @@ import qualified Graphics.Haskan.Vulkan.RenderPass as RenderPass
 import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
 import Graphics.Haskan.Resources (throwVkResult, allocaAndPeekVkResult)
 
+import Graphics.Haskan.Vulkan.Types (RenderContext(..), RenderResult(..))
+
 maxFramesInFlight :: Int
 maxFramesInFlight = 2
-
-data RenderContext =
-  RenderContext { device :: Vulkan.VkDevice
-                , swapchain :: Vulkan.VkSwapchainKHR
-                , graphicsCommandBuffers :: [Vulkan.VkCommandBuffer]
-                , graphicsQueueHandler :: Vulkan.VkQueue
-                , presentQueueHandler :: Vulkan.VkQueue
---                , imageAvailableSemaphore :: Vulkan.VkSemaphore
-                , renderFinishedFences :: [Vulkan.VkFence]
-                , renderFinishedSemaphores :: [Vulkan.VkSemaphore]
-                }
-  deriving (Show)
-
-type ImageIndex = Vulkan.Word32
-
-data RenderResult
-  = FrameOk ImageIndex
-  | FrameSuboptimal ImageIndex
-  | FrameOutOfDate
-  | FrameFailed String
-  deriving (Eq, Show)
 
 createRenderContext
   :: (MonadIO m, MonadManaged m)

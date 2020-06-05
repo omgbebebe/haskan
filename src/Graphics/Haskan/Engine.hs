@@ -25,7 +25,8 @@ import qualified Control.Concurrent.STM.TChan as TChan
 
 -- haskan
 --import Graphics.Haskan.Events (EventsQueue)
-import Graphics.Haskan.Vulkan.Render (RenderContext)
+import Graphics.Haskan.Vulkan.Types (RenderContext)
+import Graphics.Haskan.Logger (logI, showT)
 
 data HaskanConfig =
   HaskanConfig{ targetRenderFPS :: !Integer
@@ -73,15 +74,14 @@ mainLoop config@HaskanConfig{..} = liftIO $ do
  
   printMVar <- newMVar ()
   let gameState = GameState worldState isRunning
-      logI msg = withMVar printMVar $ \_ -> putStrLn msg
 
   timeNow <- toNanoSecs <$> getTime Monotonic
 
   renderLoopFinished <- newEmptyMVar
-  forkIO (renderLoop targetRenderFPS gameState renderLoopFinished controlChannel logI)
+  forkIO (renderLoop targetRenderFPS gameState renderLoopFinished controlChannel)
 
   physicsLoopFinished <- newEmptyMVar
-  forkIO (physicsLoop targetPhysicsFPS gameState physicsLoopFinished controlChannel logI)
+  forkIO (physicsLoop targetPhysicsFPS gameState physicsLoopFinished controlChannel)
 
   Async.forConcurrently_ [renderLoopFinished, physicsLoopFinished] $ \sem -> do
     takeMVar sem
@@ -105,8 +105,8 @@ mainLoop config@HaskanConfig{..} = liftIO $ do
   pure True
 
 --renderLoop :: MonadIO m => Integer -> RenderContext -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
-renderLoop :: MonadIO m => Integer -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
-renderLoop targetFPS gameState finishedSemaphore controlChannel logI = liftIO $ do
+renderLoop :: MonadIO m => Integer -> GameState -> MVar () -> TChan ControlMessage -> m ()
+renderLoop targetFPS gameState finishedSemaphore controlChannel = liftIO $ do
   control <- STM.atomically $ TChan.dupTChan controlChannel
 
   let
@@ -118,7 +118,7 @@ renderLoop targetFPS gameState finishedSemaphore controlChannel logI = liftIO $ 
           worldState <- STM.readTVarIO (world gameState)
           camera <- STM.readTVarIO (activeCamera worldState)
 
-          logI ("render frame: " <> show targetFPS <> " => " <> show (camPos camera))
+          logI ("render frame: " <> showT targetFPS <> " => " <> showT (camPos camera))
           threadDelay (10^5)
           when (targetFPS > 0) $ loop (targetFPS-1) gameState finishedSemaphore
         Just Terminate -> do
@@ -132,8 +132,8 @@ renderLoop targetFPS gameState finishedSemaphore controlChannel logI = liftIO $ 
 
 
 --physicsLoop :: MonadIO m => Integer -> RenderContext -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
-physicsLoop :: MonadIO m => Integer -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
-physicsLoop targetFPS gameState finishedSemaphore controlChannel logI = liftIO $ do
+physicsLoop :: MonadIO m => Integer -> GameState -> MVar () -> TChan ControlMessage -> m ()
+physicsLoop targetFPS gameState finishedSemaphore controlChannel = liftIO $ do
   control <- STM.atomically $ TChan.dupTChan controlChannel
 
   let
@@ -145,9 +145,9 @@ physicsLoop targetFPS gameState finishedSemaphore controlChannel logI = liftIO $
           worldState <- STM.readTVarIO (world gameState)
           STM.atomically . STM.modifyTVar (activeCamera worldState) $ \camera ->
             camera{ camPos = (camPos camera) - (V3 0.0 0.0 0.1) }
-          logI ("physics frame: " <> show targetFPS <> " => camPos modified")
+          logI ("physics frame: " <> showT targetFPS <> " => camPos modified")
           threadDelay (10^5)
-          when (targetFPS > 0) $ loop (targetFPS-3) gameState finishedSemaphore
+          when (targetFPS > 0) $ loop (targetFPS-2) gameState finishedSemaphore
         Just Terminate -> do
           logI "terminating physics loop by signal"
         Just _ -> do

@@ -20,7 +20,6 @@ import           Foreign.Storable (Storable, peek)
 
 -- text
 import Data.Text (Text)
-import qualified Data.Text.IO as T
 
 -- managed
 import Control.Monad.Managed (MonadManaged, using, managed)
@@ -28,13 +27,16 @@ import Control.Monad.Managed (MonadManaged, using, managed)
 -- vulkan-api
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 
+-- haskan
+import Graphics.Haskan.Logger (logI, showT)
+
 alloc :: MonadManaged m => Text -> IO a -> (a -> IO b) -> m a
 alloc resName create destroy =
   using
   ( managed
     ( bracket
-      (T.putStrLn ("allocate " <> resName) *> create)
-      (\r -> T.putStrLn ("deallocate " <> resName) *> (destroy r))
+      (logI ("allocate " <> resName) *> create)
+      (\r -> logI ("deallocate " <> resName) *> (destroy r))
     )
   )
 

@@ -5,6 +5,4 @@ import qualified Graphics.Haskan as Haskan
 
 main :: IO ()
 main = do
-  putStrLn "Starting here..."
-  Haskan.initHaskan "Haskan Demo"
-  putStrLn "Hello, Haskell!"
+  Haskan.runHaskan "Haskan Demo"
