@@ -20,8 +20,8 @@ runHaskan title = do
   logI "Initialize Haskan Engine"
   logI "Starting Engine main loop"
   Engine.mainLoop
-    EngineConfig{ targetRenderFPS = 60
-                , targetPhysicsFPS = 300
+    EngineConfig{ targetRenderFPS = 120
+                , targetPhysicsFPS = 100
                 , targetNetworkFPS = 10
                 , targetInputFPS = 200
                 , title = title
