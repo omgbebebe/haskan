@@ -85,7 +85,7 @@ data Action
   | StrafeRight
   | MouseMove (V2 Int)
   | Escape
-  deriving (Show)
+  deriving (Eq, Show)
 
 type ActionEvent = (Action, Bool)
 
@@ -155,21 +155,66 @@ mainLoop EngineConfig{..} = do
         tvStrafeLeft
         tvStrafeRight
 
-  -- timeNow <- liftIO $ toNanoSecs <$> getTime Monotonic
+  SDL.initialize @[] [SDL.InitEvents]
 
+  logI "Initialize base Render context"
+  let initWidth = 1920
+      initHeight = 1080
+  window <- Window.createWindow title (initWidth, initHeight)
+  windowExts <- Window.windowExtensions window
+  (inst, layers)   <- Instance.createInstance windowExts
+  surface          <- Window.createSurface inst window
+  physicalDevice   <- PhysicalDevice.selectPhysicalDevice inst
+  Window.showWindow window
+ 
+  -- timeNow <- liftIO $ toNanoSecs <$> getTime Monotonic
   renderLoopFinished <- liftIO $ newEmptyMVar
-  _ <- liftIO $ forkIO (runManaged (renderLoop title targetRenderFPS gameState renderLoopFinished controlChannel))
+  _ <- liftIO $ forkIO (runManaged (renderLoop physicalDevice surface layers targetRenderFPS gameState renderLoopFinished controlChannel))
 
   stateUpdateLoopFinished <- liftIO $ newEmptyMVar
   _ <- liftIO $ forkIO (stateUpdateLoop targetPhysicsFPS gameState stateUpdateLoopFinished actionQueue controlChannel)
 
-  inputLoopFinished <- liftIO $ newEmptyMVar
-  _ <- liftIO $ forkIO (runManaged $ inputLoop targetInputFPS inputLoopFinished actionQueue controlChannel)
 
-  liftIO $ Async.forConcurrently_ [renderLoopFinished, stateUpdateLoopFinished, inputLoopFinished] $ \sem -> do
+  let
+    inputLoop :: MonadIO m => m ()
+    inputLoop = do
+      events <- SDL.pollEvents
+      let
+        actionEvents = catMaybes $ map (payloadToActionEvent . SDL.eventPayload) events
+        quitting = (Escape, True) `elem` actionEvents
+      liftIO $ STM.atomically $ for_ actionEvents $ TQueue.writeTQueue actionQueue
+      SDL.delay 20
+      {-
+      event <- SDL.pollEvent
+      case event of
+        Just event -> do
+          let
+            action = payloadToActionEvent . SDL.eventPayload $ event
+          case action of
+            Just action -> liftIO $ STM.atomically $ TQueue.writeTQueue actionQueue action
+            Nothing -> pure ()
+        Nothing -> pure ()
+      -}
+      unless ( quitting ) inputLoop
+
+  inputLoop
+
+  logI "sending Terminate message"
+  liftIO $ STM.atomically $ TChan.writeTChan controlChannel Terminate
+  logI "waiting for other threads finished"
+  liftIO $ Async.forConcurrently_ [renderLoopFinished, stateUpdateLoopFinished] $ \sem -> do
+    takeMVar sem
+
+  SDL.quit
+--  inputLoopFinished <- liftIO $ newEmptyMVar
+--  _ <- liftIO $ forkIO (runManaged $ inputLoop targetInputFPS inputLoopFinished actionQueue controlChannel)
+
+{-
+  liftIO $ Async.forConcurrently_ [renderLoopFinished, stateUpdateLoopFinished] $ \sem -> do
     takeMVar sem
     logI "sending Terminate message"
     STM.atomically $ TChan.writeTChan controlChannel Terminate
+-}
 {-
   let
     waitForFinished = do
@@ -247,19 +292,18 @@ renderFrameLoop ctx@RenderContext{..} frameNumber targetFPS imageAvailableSemaph
         tvCamera
 
 --renderLoop :: MonadIO m => Integer -> RenderContext -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
-renderLoop :: MonadManaged m => Text -> Integer -> GameState -> MVar () -> TChan ControlMessage -> m ()
-renderLoop title targetFPS gameState finishedSemaphore controlChannel = do
+renderLoop
+  :: MonadManaged m
+  => Vulkan.VkPhysicalDevice
+  -> Vulkan.VkSurfaceKHR
+  -> [String]
+  -> Integer
+  -> GameState
+  -> MVar ()
+  -> TChan ControlMessage
+  -> m ()
+renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore controlChannel = do
   control <- liftIO $ STM.atomically $ TChan.dupTChan controlChannel
-  logI "Initializing events managed"
-
-  logI "Initialize base Render context"
-  let initWidth = 1920
-      initHeight = 1080
-  (windowExts, window) <- Window.managedWindow title (initWidth, initHeight)
-  (inst, layers)   <- Instance.managedInstance windowExts
-  surface          <- Window.managedSurface inst window
-  physicalDevice   <- PhysicalDevice.selectPhysicalDevice inst
-  Window.showWindow window
 
   (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
 
@@ -394,8 +438,8 @@ stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel
   control <- STM.atomically $ TChan.dupTChan controlChannel
 
   let physicsStep = 1/120
-      frameDelay = physicsStep * 1000000
-      camSpeed = 100
+      frameDelay = physicsStep * 100000
+      camSpeed = 10
 
   let
     loop :: MonadIO m => Integer -> GameState -> Integer -> m ()
@@ -414,6 +458,18 @@ stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel
               (MoveBackward, b) -> STM.atomically $ STM.writeTVar (moveBackward gameState) b
               (StrafeLeft, b) -> STM.atomically $ STM.writeTVar (strafeLeft gameState) b
               (StrafeRight, b) -> STM.atomically $ STM.writeTVar (strafeRight gameState) b
+              (MouseMove (V2 x y), _) ->
+                STM.atomically
+                  (
+                    updateCamera (activeCamera worldState)
+                      id
+                      (\v ->
+                         let
+                           relX = fromIntegral x
+                           relY = fromIntegral y
+                         in v + (V3 (relX/frameDelay) (relY/frameDelay) 0.0)
+                      )
+                  )
               (Escape, _) -> STM.atomically $ STM.writeTVar (isRunning gameState) False
           let dt = newTime - prevTime
 
@@ -439,30 +495,6 @@ stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel
   logI "stateUpdateLoop finished"
   putMVar finishedSemaphore ()
 
-
-inputLoop :: MonadManaged m => Integer -> MVar () -> TQueue ActionEvent -> TChan ControlMessage -> m ()
-inputLoop targetFPS finishedSemaphore actionQueue controlChannel = do
-  control <- liftIO $ STM.atomically $ TChan.dupTChan controlChannel
-  Events.managedEvents
-
-  let
-    loop :: MonadIO m => Integer -> m ()
-    loop tFPS = liftIO $ do
-      maybeControlMessage <- STM.atomically $ TChan.tryReadTChan control
-      case maybeControlMessage of
-        Nothing -> do
-          events <- SDL.pollEvents
-          let
-            actions = catMaybes $ map (payloadToActionEvent . SDL.eventPayload) events
-          threadDelay (10000)
-          STM.atomically $ for_ actions $ TQueue.writeTQueue actionQueue
-          loop tFPS
-        Just Terminate -> do
-          logI "terminating input loop by signal"
-
-  loop targetFPS
-  logI "inputLoop finished"
-  liftIO $ putMVar finishedSemaphore ()
 
 updateCamera
   :: TVar Camera
@@ -524,8 +556,15 @@ modifiersToList SDL.KeyModifier{..} = []
 payloadToActionEvent :: SDL.EventPayload -> Maybe ActionEvent
 payloadToActionEvent SDL.QuitEvent = Just (Escape, True)
 payloadToActionEvent (SDL.KeyboardEvent keyboardEvent) = keyToAction keyboardEvent
+payloadToActionEvent (SDL.MouseMotionEvent mouseMotionEvent) = mouseMotionToAction mouseMotionEvent
 payloadToActionEvent _ = Nothing
 
+mouseMotionToAction :: SDL.MouseMotionEventData -> Maybe ActionEvent
+mouseMotionToAction (SDL.MouseMotionEventData _window _mouseDevice _mouseButtons _absolutePosition relativePosition) =
+  let
+    (SDL.V2 relX relY) = relativePosition
+  in Just ((MouseMove (V2 (fromIntegral relX) (fromIntegral relY))), True)
+ 
 keyToAction :: SDL.KeyboardEventData -> Maybe ActionEvent
 keyToAction (SDL.KeyboardEventData _window motion isRepeated keysym)
   | isRepeated = Nothing

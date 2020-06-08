@@ -18,6 +18,7 @@ extra-source-files:  CHANGELOG.md
 
 executable haskan
   ghc-options:         -optl-mconsole -O2 -threaded
+--  ghc-options:         -optl-mconsole -O0
   main-is:             Main.hs
   -- other-modules:
   -- other-extensions:

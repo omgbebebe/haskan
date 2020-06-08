@@ -1,7 +1,7 @@
 module Graphics.Haskan.Vulkan.Instance where
 
 -- base
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Foldable (for_)
 import Data.List (partition)
 
@@ -36,7 +36,7 @@ managedInstance extraExtensions = alloc "VkInstance"
   (createInstance extraExtensions)
   (\(ptr,_) -> Vulkan.vkDestroyInstance ptr Vulkan.vkNullPtr)
 
-createInstance :: [ByteString] -> IO (Vulkan.VkInstance, [String])
+createInstance :: MonadIO m => [ByteString] -> m (Vulkan.VkInstance, [String])
 createInstance extraExtensions = do
   let
     partitionOptReq :: (Show a, Eq a, MonadIO m) => Text -> [a] -> [a] -> [a] -> m [a]
@@ -58,7 +58,7 @@ createInstance extraExtensions = do
     fmap (BC.pack . Vulkan.getStringField @"layerName")
     <$> peekVkList (Vulkan.vkEnumerateInstanceLayerProperties)
 
-  reqExtensions <- BC.packCString Vulkan.VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+  reqExtensions <- liftIO $ BC.packCString Vulkan.VK_EXT_DEBUG_UTILS_EXTENSION_NAME
 
   extensions <- fmap BC.unpack <$>
     partitionOptReq
