@@ -34,7 +34,7 @@ import qualified Linear.Projection
 import qualified Linear.Quaternion
 
 -- managed
-import Control.Monad.Managed (MonadManaged, with, runManaged)
+import Control.Monad.Managed (MonadManaged, with, runManaged, using)
 
 -- sdl2
 import qualified SDL
@@ -75,6 +75,7 @@ import qualified Graphics.Haskan.Vulkan.PipelineLayout as PipelineLayout
 import qualified Graphics.Haskan.Vulkan.PhysicalDevice as PhysicalDevice
 import qualified Graphics.Haskan.Vulkan.Semaphore as Semaphore
 import qualified Graphics.Haskan.Vulkan.ShaderModule as ShaderModule
+import qualified Graphics.Haskan.Vulkan.Texture as Texture
 import           Graphics.Haskan.Vulkan.Types (RenderContext(..))
 import qualified Graphics.Haskan.Window as Window
 
@@ -293,7 +294,7 @@ renderFrameLoop ctx@RenderContext{..} frameNumber targetFPS imageAvailableSemaph
 
 --renderLoop :: MonadIO m => Integer -> RenderContext -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
 renderLoop
-  :: MonadManaged m
+  :: (MonadFail m, MonadManaged m)
   => Vulkan.VkPhysicalDevice
   -> Vulkan.VkSurfaceKHR
   -> [String]
@@ -395,6 +396,7 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
       [vertexBuffer]
       [indexBuffer]
 
+  texture <- Texture.managedTexture physicalDevice device "data/texture/redbricks2b/redbricks2b-albedo.png"
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
   worldState <- liftIO $ STM.readTVarIO (world gameState)
   let

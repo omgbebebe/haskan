@@ -90,17 +90,26 @@ bindBufferMemory
   -> Vulkan.VkDeviceMemory
   -> [a]
   -> m ()
-bindBufferMemory dev buffer memory data' = do
+bindBufferMemory dev buffer memory data' = liftIO $ do
+  putStrLn "bind memory"
+  Vulkan.vkBindBufferMemory dev buffer memory 0 {- offset-} >>= throwVkResult
+  copyDataToDeviceMemory dev memory data'
+  putStrLn "end bind memory"
+
+copyDataToDeviceMemory
+  :: (MonadIO m, Storable a)
+  => Vulkan.VkDevice
+  -> Vulkan.VkDeviceMemory
+  -> [a]
+  -> m ()
+copyDataToDeviceMemory dev memory data' = liftIO $ do
   let
     size = fromIntegral ((length data') * (Foreign.sizeOf (head data')))
-  liftIO $ do
-    putStrLn "bind memory"
-    Vulkan.vkBindBufferMemory dev buffer memory 0 {- offset-} >>= throwVkResult
-    memPtr <-
-      allocaAndPeek (Vulkan.vkMapMemory dev memory 0 size Vulkan.VK_ZERO_FLAGS)
-    Foreign.Marshal.pokeArray (Foreign.castPtr memPtr) data'
-    Vulkan.vkUnmapMemory dev memory
-    putStrLn "end bind memory"
+
+  memPtr <-
+    allocaAndPeek (Vulkan.vkMapMemory dev memory 0 size Vulkan.VK_ZERO_FLAGS)
+  Foreign.Marshal.pokeArray (Foreign.castPtr memPtr) data'
+  Vulkan.vkUnmapMemory dev memory
 
 managedVertexBuffer :: (MonadManaged m) => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> [Vertex] -> m Vulkan.VkBuffer
 managedVertexBuffer pdev dev vertices = do

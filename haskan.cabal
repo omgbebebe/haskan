@@ -61,6 +61,7 @@ library
                        Graphics.Haskan.Vulkan.ShaderModule
                        Graphics.Haskan.Vulkan.Semaphore
                        Graphics.Haskan.Vulkan.Swapchain
+                       Graphics.Haskan.Vulkan.Texture
                        Graphics.Haskan.Vulkan.Types
                        Graphics.Haskan.Vulkan.VertexFormat
                        Graphics.Haskan.Window
@@ -72,6 +73,7 @@ library
                      , co-log >= 0.4 && <0.5
                      , clock >=0.8
                      , hashable
+                     , JuicyPixels >=3.3.5
                      , lens
                      , linear
                      , managed >=1.0.7
