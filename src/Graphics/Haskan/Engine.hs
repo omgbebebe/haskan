@@ -65,6 +65,7 @@ import           Graphics.Haskan.Vulkan.Render (drawFrame, presentFrame)
 import qualified Graphics.Haskan.Vulkan.Buffer as Buffer
 import qualified Graphics.Haskan.Vulkan.Render as Render
 import qualified Graphics.Haskan.Vulkan.CommandPool as CommandPool
+import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
 import qualified Graphics.Haskan.Vulkan.DescriptorPool as DescriptorPool
 import qualified Graphics.Haskan.Vulkan.DescriptorSet as DescriptorSet
 import qualified Graphics.Haskan.Vulkan.DescriptorSetLayout as DescriptorSetLayout
@@ -396,7 +397,14 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
       [vertexBuffer]
       [indexBuffer]
 
-  texture <- Texture.managedTexture physicalDevice device "data/texture/redbricks2b/redbricks2b-albedo.png"
+  textureCommandBuffer <- CommandBuffer.createCommandBuffer device graphicsCommandPool
+  texture <-
+    Texture.managedTexture
+    physicalDevice
+    device
+    "data/texture/redbricks2b/redbricks2b-albedo.png"
+    graphicsQueueHandler
+    textureCommandBuffer
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
   worldState <- liftIO $ STM.readTVarIO (world gameState)
   let

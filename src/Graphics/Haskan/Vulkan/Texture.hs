@@ -23,6 +23,7 @@ import Graphics.Vulkan.Marshal.Create ((&*), set)
 
 -- haskan
 import qualified Graphics.Haskan.Vulkan.Buffer as Haskan
+import qualified Graphics.Haskan.Vulkan.CommandBuffer as Haskan
 import qualified Graphics.Haskan.Vulkan.Memory as Haskan
 import Graphics.Haskan.Resources (alloc, allocaAndPeek, allocaAndPeek_, throwVkResult)
 
@@ -33,10 +34,10 @@ readImageFromFile
 readImageFromFile filePath = do
   image <- liftIO $ readImageWithMetadata filePath >>=
     \case
-      Right (dynamicImage, imageMetadata) -> pure dynamicImage
+      Right (dynamicImage, imageMetadata) -> pure (convertRGBA8 dynamicImage)
       Left e -> fail e
 
-  let (ImageRGB8 (Image width height imageData)) = image
+  let (Image width height imageData) = image
   pure (imageData, width, height)
 
 managedTexture
@@ -44,8 +45,10 @@ managedTexture
   => Vulkan.VkPhysicalDevice
   -> Vulkan.VkDevice
   -> FilePath -- Data.Vector.Storable.Vector Word8
+  -> Vulkan.VkQueue
+  -> Vulkan.VkCommandBuffer
   -> m Vulkan.VkBuffer
-managedTexture pdev dev filePath = do
+managedTexture pdev dev filePath queue commandBuffer = do
   (imgData, width, height) <- liftIO (readImageFromFile filePath)
   let
     dataList = Vector.toList imgData
@@ -56,7 +59,9 @@ managedTexture pdev dev filePath = do
   stagingMemory <-
     Haskan.managedBufferMemory pdev dev stagingMemoryRequirement
 
-  liftIO $ Haskan.copyDataToDeviceMemory dev stagingMemory dataList
+  liftIO $ do
+    Haskan.bindBufferMemory dev stagingBuffer stagingMemory dataList
+    Haskan.copyDataToDeviceMemory dev stagingMemory dataList
 
   let
     imageExtent = Vulkan.createVk
@@ -71,7 +76,7 @@ managedTexture pdev dev filePath = do
       &* set @"extent" imageExtent
       &* set @"mipLevels" 1
       &* set @"arrayLayers" 1
-      &* set @"format" Vulkan.VK_FORMAT_R8G8B8_SRGB
+      &* set @"format" Vulkan.VK_FORMAT_R8G8B8A8_SRGB
       &* set @"tiling" Vulkan.VK_IMAGE_TILING_OPTIMAL
       &* set @"initialLayout" Vulkan.VK_IMAGE_LAYOUT_UNDEFINED
       &* set @"usage" (Vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT .|. Vulkan.VK_IMAGE_USAGE_SAMPLED_BIT)
@@ -93,7 +98,27 @@ managedTexture pdev dev filePath = do
     Haskan.allocateMemoryFor pdev dev imageMemoryRequirements [Vulkan.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT]
 
   bindImageMemory dev image imageMemory 0
- 
+
+  Haskan.withCommandBufferOneTime queue commandBuffer $ do
+    Haskan.layerTransition
+      commandBuffer
+      image
+      Vulkan.VK_IMAGE_LAYOUT_UNDEFINED
+      Vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+
+    Haskan.copyBufferToImage
+      commandBuffer
+      stagingBuffer
+      image
+      (fromIntegral width) (fromIntegral height)
+
+    Haskan.layerTransition
+      commandBuffer
+      image
+      Vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+      Vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+
+  liftIO $ Vulkan.vkQueueWaitIdle queue >>= throwVkResult
   pure stagingBuffer
 
 bindImageMemory
