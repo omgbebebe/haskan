@@ -11,7 +11,7 @@ import Linear (V2(..), V3(..), V4(..))
 -- haskan
 import Graphics.Haskan.Vulkan.VertexFormat
 
-type Vertex = V2 (V3 Foreign.C.CFloat)
+type Vertex = V3 (V3 Foreign.C.CFloat)
 type VertexIndex = Foreign.Word32
 {-
 data Vertex = Vertex{ vPos :: V3 Foreign.C.CFloat

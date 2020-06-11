@@ -24,6 +24,7 @@ import Graphics.Vulkan.Marshal.Create ((&*), set)
 -- haskan
 import qualified Graphics.Haskan.Vulkan.Buffer as Haskan
 import qualified Graphics.Haskan.Vulkan.CommandBuffer as Haskan
+import qualified Graphics.Haskan.Vulkan.ImageView as Haskan
 import qualified Graphics.Haskan.Vulkan.Memory as Haskan
 import Graphics.Haskan.Resources (alloc, allocaAndPeek, allocaAndPeek_, throwVkResult)
 
@@ -47,7 +48,7 @@ managedTexture
   -> FilePath -- Data.Vector.Storable.Vector Word8
   -> Vulkan.VkQueue
   -> Vulkan.VkCommandBuffer
-  -> m Vulkan.VkBuffer
+  -> m Vulkan.VkImageView
 managedTexture pdev dev filePath queue commandBuffer = do
   (imgData, width, height) <- liftIO (readImageFromFile filePath)
   let
@@ -64,6 +65,7 @@ managedTexture pdev dev filePath queue commandBuffer = do
     Haskan.copyDataToDeviceMemory dev stagingMemory dataList
 
   let
+    format = Vulkan.VK_FORMAT_R8G8B8A8_SRGB
     imageExtent = Vulkan.createVk
       (  set @"width" (fromIntegral width)
       &* set @"height" (fromIntegral height)
@@ -76,7 +78,7 @@ managedTexture pdev dev filePath queue commandBuffer = do
       &* set @"extent" imageExtent
       &* set @"mipLevels" 1
       &* set @"arrayLayers" 1
-      &* set @"format" Vulkan.VK_FORMAT_R8G8B8A8_SRGB
+      &* set @"format" format
       &* set @"tiling" Vulkan.VK_IMAGE_TILING_OPTIMAL
       &* set @"initialLayout" Vulkan.VK_IMAGE_LAYOUT_UNDEFINED
       &* set @"usage" (Vulkan.VK_IMAGE_USAGE_TRANSFER_DST_BIT .|. Vulkan.VK_IMAGE_USAGE_SAMPLED_BIT)
@@ -119,7 +121,8 @@ managedTexture pdev dev filePath queue commandBuffer = do
       Vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 
   liftIO $ Vulkan.vkQueueWaitIdle queue >>= throwVkResult
-  pure stagingBuffer
+  imageView <- Haskan.managedImageView dev format image
+  pure imageView
 
 bindImageMemory
   :: (MonadFail m, MonadIO m)
@@ -130,3 +133,40 @@ bindImageMemory
   -> m ()
 bindImageMemory dev image memory offset =
   liftIO (Vulkan.vkBindImageMemory dev image memory offset) >>= throwVkResult
+
+managedSampler
+  :: MonadManaged m
+  => Vulkan.VkDevice
+  -> m Vulkan.VkSampler
+managedSampler dev = alloc "Sampler"
+  (createSampler dev)
+  (\ptr -> Vulkan.vkDestroySampler dev ptr Vulkan.vkNullPtr)
+
+createSampler
+  :: MonadIO m
+  => Vulkan.VkDevice
+  -> m Vulkan.VkSampler
+createSampler dev =
+  let
+    createInfo = Vulkan.createVk
+      (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO
+      &* set @"pNext" Vulkan.VK_NULL
+      &* set @"magFilter" Vulkan.VK_FILTER_LINEAR
+      &* set @"minFilter" Vulkan.VK_FILTER_LINEAR
+      &* set @"addressModeU" Vulkan.VK_SAMPLER_ADDRESS_MODE_REPEAT
+      &* set @"addressModeV" Vulkan.VK_SAMPLER_ADDRESS_MODE_REPEAT
+      &* set @"addressModeW" Vulkan.VK_SAMPLER_ADDRESS_MODE_REPEAT
+--      &* set @"anisotropyEnable" Vulkan.VK_TRUE
+--      &* set @"maxAnisotropy" 16.0
+      &* set @"anisotropyEnable" Vulkan.VK_FALSE
+      &* set @"maxAnisotropy" 1.0
+      &* set @"borderColor" Vulkan.VK_BORDER_COLOR_INT_OPAQUE_BLACK
+      &* set @"unnormalizedCoordinates" Vulkan.VK_FALSE
+      &* set @"compareEnable" Vulkan.VK_FALSE
+      &* set @"compareOp" Vulkan.VK_COMPARE_OP_ALWAYS
+      &* set @"mipmapMode" Vulkan.VK_SAMPLER_MIPMAP_MODE_LINEAR
+      &* set @"mipLodBias" 0.0
+      &* set @"minLod" 0.0
+      &* set @"maxLod" 0.0
+      )
+  in allocaAndPeek (Vulkan.vkCreateSampler dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)

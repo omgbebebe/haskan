@@ -27,6 +27,7 @@ import qualified Graphics.Haskan.Vulkan.CommandBuffer as CommandBuffer
 import qualified Graphics.Haskan.Vulkan.DescriptorSet as DescriptorSet
 import qualified Graphics.Haskan.Vulkan.Framebuffer as Framebuffer
 import qualified Graphics.Haskan.Vulkan.GraphicsPipeline as GraphicsPipeline
+import qualified Graphics.Haskan.Vulkan.ImageView as Haskan
 import qualified Graphics.Haskan.Vulkan.PhysicalDevice as PhysicalDevice
 import qualified Graphics.Haskan.Vulkan.RenderPass as RenderPass
 import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
@@ -70,11 +71,12 @@ createRenderContext
   vertexBuffers
   indexBuffers = do
   let depthFormat = Vulkan.VK_FORMAT_D32_SFLOAT
+      format = Vulkan.getField @"format" Swapchain.surfaceFormat
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
   swapchain <- Swapchain.managedSwapchain device surface surfaceExtent
   -- TODO: embed imageViews somewhere
   images <- Swapchain.getSwapchainImages device swapchain
-  imageViews <- for images (Swapchain.managedImageView device Swapchain.surfaceFormat)
+  imageViews <- for images (Haskan.managedImageView device format)
 
   renderPass <- RenderPass.managedRenderPass device Swapchain.surfaceFormat depthFormat
   graphicsPipeline <-

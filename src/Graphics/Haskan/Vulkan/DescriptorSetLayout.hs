@@ -30,11 +30,18 @@ createDescriptorSetLayout dev = do
       &* set @"stageFlags" Vulkan.VK_SHADER_STAGE_VERTEX_BIT
       &* set @"pImmutableSamplers" Vulkan.VK_NULL
       )
+    sampler = Vulkan.createVk
+      (  set @"binding" 1
+      &* set @"descriptorCount" 1
+      &* set @"descriptorType" Vulkan.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
+      &* set @"pImmutableSamplers" Vulkan.VK_NULL
+      &* set @"stageFlags" Vulkan.VK_SHADER_STAGE_FRAGMENT_BIT
+      )
     createInfo = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
       &* set @"pNext" Vulkan.VK_NULL
       &* set @"flags" Vulkan.VK_ZERO_FLAGS
-      &* set @"bindingCount" 1
-      &* setListRef @"pBindings" [ binding ]
+      &* set @"bindingCount" 2
+      &* setListRef @"pBindings" [ binding, sampler ]
       )
     in allocaAndPeek (Vulkan.vkCreateDescriptorSetLayout dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)

@@ -312,8 +312,8 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   graphicsQueueHandler <- Device.getDeviceQueueHandler device graphicsQueueFamilyIndex 0
   presentQueueHandler <- Device.getDeviceQueueHandler device presentQueueFamilyIndex 0
 
-  vertShader <- ShaderModule.managedShaderModule device "data/shaders/mvp/vert.spv"
-  fragShader <- ShaderModule.managedShaderModule device "data/shaders/mvp/frag.spv"
+  vertShader <- ShaderModule.managedShaderModule device "data/shaders/texture/vert.spv"
+  fragShader <- ShaderModule.managedShaderModule device "data/shaders/texture/frag.spv"
 
   descriptorSetLayout <- DescriptorSetLayout.managedDescriptorSetLayout device
 
@@ -332,20 +332,20 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
     zPos2 = ( 3)
     zPos3 = ( 1)
     vertices =
-      [V2 (V3 (-1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) -- 0
-      ,V2 (V3 (-1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) -- 1
-      ,V2 (V3 ( 1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) -- 2
-      ,V2 (V3 ( 1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) -- 3
+      [V3 (V3 (-1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) (V3 0.0 0.0 0.0) -- 0
+      ,V3 (V3 (-1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) (V3 1.0 0.0 0.0) -- 1
+      ,V3 (V3 ( 1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) (V3 1.0 1.0 0.0) -- 2
+      ,V3 (V3 ( 1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) (V3 0.0 1.0 0.0) -- 3
 
-      ,V2 (V3 (-1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) -- 4
-      ,V2 (V3 (-1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) -- 5
-      ,V2 (V3 ( 1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) -- 6
-      ,V2 (V3 ( 1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) -- 7
+      ,V3 (V3 (-1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) (V3 0.0 0.0 0.0) -- 4
+      ,V3 (V3 (-1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) (V3 1.0 0.0 0.0) -- 5
+      ,V3 (V3 ( 1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) (V3 1.0 1.0 0.0) -- 6
+      ,V3 (V3 ( 1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) (V3 0.0 1.0 0.0) -- 7
 
-      ,V2 (V3 (-1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) -- 8
-      ,V2 (V3 (-1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) -- 9
-      ,V2 (V3 ( 1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) -- 10
-      ,V2 (V3 ( 1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) -- 11
+      ,V3 (V3 (-1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) (V3 0.0 0.0 0.0) -- 8
+      ,V3 (V3 (-1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) (V3 1.0 0.0 0.0) -- 9
+      ,V3 (V3 ( 1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) (V3 1.0 1.0 0.0) -- 10
+      ,V3 (V3 ( 1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) (V3 0.0 1.0 0.0) -- 11
       ]
     indices = [
         0, 1, 2
@@ -377,8 +377,25 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
        device
        [ mvpMatrix (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0)]
 
+  textureCommandBuffer <- CommandBuffer.createCommandBuffer device graphicsCommandPool
+  textureImageView <-
+    Texture.managedTexture
+    physicalDevice
+    device
+    "data/texture/redbricks2b/redbricks2b-albedo.png"
+    graphicsQueueHandler
+    textureCommandBuffer
 
-  for_ descriptorSets $ \descriptorSet -> DescriptorSet.updateDescriptorSets device descriptorSet mvpBuffer
+  textureSampler <- Texture.managedSampler device
+
+  for_ descriptorSets $
+    \descriptorSet ->
+      DescriptorSet.updateDescriptorSets
+        device
+        descriptorSet
+        mvpBuffer
+        textureImageView
+        textureSampler
 
   let
     mkRenderContext = Render.createRenderContext
@@ -397,14 +414,6 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
       [vertexBuffer]
       [indexBuffer]
 
-  textureCommandBuffer <- CommandBuffer.createCommandBuffer device graphicsCommandPool
-  texture <-
-    Texture.managedTexture
-    physicalDevice
-    device
-    "data/texture/redbricks2b/redbricks2b-albedo.png"
-    graphicsQueueHandler
-    textureCommandBuffer
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
   worldState <- liftIO $ STM.readTVarIO (world gameState)
   let
