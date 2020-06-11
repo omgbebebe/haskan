@@ -126,7 +126,7 @@ layerTransition commandBuffer image oldLayout newLayout = do
         (Vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, Vulkan.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) ->
           (Vulkan.VK_PIPELINE_STAGE_TRANSFER_BIT
           ,Vulkan.VK_ACCESS_TRANSFER_WRITE_BIT
-          ,Vulkan.VK_PIPELINE_STAGE_TRANSFER_BIT
+          ,Vulkan.VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
           ,Vulkan.VK_ACCESS_SHADER_READ_BIT
           )
 
