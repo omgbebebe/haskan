@@ -27,7 +27,7 @@ import Data.Hashable (Hashable(..))
 import Control.Lens ((&), (.~))
 
 -- linear
-import Linear (V2(..), V3(..), M44, fromQuaternion)
+import Linear (V2(..), V3(..), V4(..), M44, fromQuaternion)
 import Linear.Matrix ((!*!), identity, m33_to_m44, translation)
 import qualified Linear.Matrix
 import qualified Linear.Projection
@@ -78,6 +78,7 @@ import qualified Graphics.Haskan.Vulkan.Semaphore as Semaphore
 import qualified Graphics.Haskan.Vulkan.ShaderModule as ShaderModule
 import qualified Graphics.Haskan.Vulkan.Texture as Texture
 import           Graphics.Haskan.Vulkan.Types (RenderContext(..))
+import           Graphics.Haskan.Vertex (Vertex(..))
 import qualified Graphics.Haskan.Window as Window
 
 data Action
@@ -332,20 +333,20 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
     zPos2 = ( 3)
     zPos3 = ( 1)
     vertices =
-      [V3 (V3 (-1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) (V3 0.0 0.0 0.0) -- 0
-      ,V3 (V3 (-1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) (V3 1.0 0.0 0.0) -- 1
-      ,V3 (V3 ( 1.0) (-1.0) zPos1) (V3 1.0 0.0 0.0) (V3 1.0 1.0 0.0) -- 2
-      ,V3 (V3 ( 1.0) ( 1.0) zPos1) (V3 1.0 0.0 0.0) (V3 0.0 1.0 0.0) -- 3
+      [Vertex {vPos = V3 (-1.0) ( 1.0) zPos1, vTexUV = V2 0.0 0.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 0 0 255} -- 0
+      ,Vertex {vPos = V3 (-1.0) (-1.0) zPos1, vTexUV = V2 0.0 1.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 0 0 255} -- 1
+      ,Vertex {vPos = V3 ( 1.0) (-1.0) zPos1, vTexUV = V2 1.0 1.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 0 0 255} -- 2
+      ,Vertex {vPos = V3 ( 1.0) ( 1.0) zPos1, vTexUV = V2 1.0 0.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 0 0 255} -- 3
 
-      ,V3 (V3 (-1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) (V3 0.0 0.0 0.0) -- 4
-      ,V3 (V3 (-1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) (V3 1.0 0.0 0.0) -- 5
-      ,V3 (V3 ( 1.0) (-1.0) zPos2) (V3 0.0 1.0 0.0) (V3 1.0 1.0 0.0) -- 6
-      ,V3 (V3 ( 1.0) ( 1.0) zPos2) (V3 0.0 1.0 0.0) (V3 0.0 1.0 0.0) -- 7
+      ,Vertex {vPos = V3 (-1.0) ( 1.0) zPos2, vTexUV = V2 0.0 0.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 0 255 0 255} -- 4
+      ,Vertex {vPos = V3 (-1.0) (-1.0) zPos2, vTexUV = V2 0.0 1.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 0 255 0 255} -- 5
+      ,Vertex {vPos = V3 ( 1.0) (-1.0) zPos2, vTexUV = V2 1.0 1.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 0 255 0 255} -- 6
+      ,Vertex {vPos = V3 ( 1.0) ( 1.0) zPos2, vTexUV = V2 1.0 0.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 0 255 0 255} -- 7
 
-      ,V3 (V3 (-1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) (V3 0.0 0.0 0.0) -- 8
-      ,V3 (V3 (-1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) (V3 1.0 0.0 0.0) -- 9
-      ,V3 (V3 ( 1.0) (-1.0) zPos3) (V3 1.0 1.0 0.0) (V3 1.0 1.0 0.0) -- 10
-      ,V3 (V3 ( 1.0) ( 1.0) zPos3) (V3 1.0 1.0 0.0) (V3 0.0 1.0 0.0) -- 11
+      ,Vertex {vPos = V3 (-1.0) ( 1.0) zPos3, vTexUV = V2 0.0 0.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 255 0 255} -- 8
+      ,Vertex {vPos = V3 (-1.0) (-1.0) zPos3, vTexUV = V2 0.0 1.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 255 0 255} -- 9
+      ,Vertex {vPos = V3 ( 1.0) (-1.0) zPos3, vTexUV = V2 1.0 1.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 255 0 255} -- 10
+      ,Vertex {vPos = V3 ( 1.0) ( 1.0) zPos3, vTexUV = V2 1.0 0.0, vNorm = V3 0.0 1.0 0.0, vCol = V4 255 255 0 255} -- 11
       ]
     indices = [
         0, 1, 2

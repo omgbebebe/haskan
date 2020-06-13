@@ -73,6 +73,7 @@ library
                      , bytestring
                      , co-log >= 0.4 && <0.5
                      , clock >=0.8
+                     , contravariant
                      , hashable
                      , JuicyPixels >=3.3.5
                      , lens

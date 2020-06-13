@@ -21,6 +21,8 @@ import Graphics.Vulkan.Marshal.Create (set, setAt, setVkRef, setListRef, setStrR
 -- haskan
 import Graphics.Haskan.Resources (alloc, allocaAndPeek)
 import Graphics.Haskan.Vertex (Vertex)
+import Graphics.Haskan.Vulkan.VertexFormat (VertexFormat)
+import qualified Graphics.Haskan.Vulkan.VertexFormat as VertexFormat
 
 managedGraphicsPipeline
   :: MonadManaged m
@@ -30,9 +32,10 @@ managedGraphicsPipeline
   -> Vulkan.VkShaderModule
   -> Vulkan.VkShaderModule
   -> Vulkan.VkExtent2D
+  -> VertexFormat v
   -> m Vulkan.VkPipeline
-managedGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent = alloc "GraphicsPipeline"
-  (createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent)
+managedGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent vertexFormat = alloc "GraphicsPipeline"
+  (createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent vertexFormat)
   (\ptr -> Vulkan.vkDestroyPipeline dev ptr Vulkan.vkNullPtr)
 
 createGraphicsPipeline
@@ -43,8 +46,9 @@ createGraphicsPipeline
   -> Vulkan.VkShaderModule
   -> Vulkan.VkShaderModule
   -> Vulkan.VkExtent2D
+  -> VertexFormat v
   -> m Vulkan.VkPipeline
-createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent = do
+createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExtent vertexFormat = do
   let
     vertStage = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
@@ -63,27 +67,10 @@ createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExte
     -- stages =
     positionBindingDescription = Vulkan.createVk
       (  set @"binding" 0
-      &* set @"stride" (fromIntegral (Foreign.sizeOf (undefined :: Vertex)))
+      &* set @"stride" (fromIntegral (VertexFormat.strideSize vertexFormat))
       &* set @"inputRate" Vulkan.VK_VERTEX_INPUT_RATE_VERTEX
       )
-    positionAttributeDescription = Vulkan.createVk
-      (  set @"location" 0
-      &* set @"binding" 0
-      &* set @"format" Vulkan.VK_FORMAT_R32G32B32_SFLOAT
-      &* set @"offset" 0
-      )
-    colorAttributeDescription = Vulkan.createVk
-      (  set @"location" 1
-      &* set @"binding" 0
-      &* set @"format" Vulkan.VK_FORMAT_R32G32B32_SFLOAT
-      &* set @"offset" (fromIntegral (Foreign.sizeOf (undefined :: V3 Foreign.C.CFloat)))
-      )
-    texCoordAttributeDescription = Vulkan.createVk
-      (  set @"location" 2
-      &* set @"binding" 0
-      &* set @"format" Vulkan.VK_FORMAT_R32G32B32_SFLOAT
-      &* set @"offset" (fromIntegral ((Foreign.sizeOf (undefined :: V3 Foreign.C.CFloat)) * 2))
-      )
+    vertexAttributeDescriptions = VertexFormat.attributeDescriptions 0 vertexFormat
 
     vertexInputStateCI = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
@@ -92,12 +79,8 @@ createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExte
       &* setListRef @"pVertexBindingDescriptions"
         [positionBindingDescription
         ]
-      &* set @"vertexAttributeDescriptionCount" 3
-      &* setListRef @"pVertexAttributeDescriptions"
-        [positionAttributeDescription
-        ,colorAttributeDescription
-        ,texCoordAttributeDescription
-        ]
+      &* set @"vertexAttributeDescriptionCount" (fromIntegral (length vertexAttributeDescriptions))
+      &* setListRef @"pVertexAttributeDescriptions" vertexAttributeDescriptions
       )
     assemblyInputStateCI = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO

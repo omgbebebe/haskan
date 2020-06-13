@@ -31,6 +31,7 @@ import qualified Graphics.Haskan.Vulkan.ImageView as Haskan
 import qualified Graphics.Haskan.Vulkan.PhysicalDevice as PhysicalDevice
 import qualified Graphics.Haskan.Vulkan.RenderPass as RenderPass
 import qualified Graphics.Haskan.Vulkan.Swapchain as Swapchain
+import qualified Graphics.Haskan.Vertex as Vertex
 import Graphics.Haskan.Resources (throwVkResult, allocaAndPeekVkResult)
 
 import Graphics.Haskan.Vulkan.Types (RenderContext(..), RenderResult(..))
@@ -87,6 +88,7 @@ createRenderContext
       vertShader
       fragShader
       surfaceExtent
+      Vertex.vertexFormat
 
   depthImage <- Swapchain.managedDepthImage pdev device surfaceExtent depthFormat
   depthImageView <- Swapchain.managedDepthView device depthImage depthFormat
