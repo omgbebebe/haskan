@@ -137,14 +137,14 @@ managedUniformBuffer pdev dev values = do
   bindBufferMemory dev buffer memory values
   pure (buffer, memory)
 
-updateUniformBuffer :: (MonadIO m, Storable a) => Vulkan.VkDevice -> Vulkan.VkDeviceMemory -> a -> m ()
+updateUniformBuffer :: (MonadIO m, Storable a) => Vulkan.VkDevice -> Vulkan.VkDeviceMemory -> [a] -> m ()
 updateUniformBuffer dev memory uniformData = do
   let
-    size = fromIntegral (Foreign.sizeOf uniformData)
+    size = fromIntegral (sum (map Foreign.sizeOf uniformData))
   memPtr <-
     allocaAndPeek (Vulkan.vkMapMemory dev memory 0 size Vulkan.VK_ZERO_FLAGS)
   liftIO $ do
-    Foreign.poke (Foreign.castPtr memPtr) uniformData
+    Foreign.pokeArray (Foreign.castPtr memPtr) uniformData
     Vulkan.vkUnmapMemory dev memory
 --managedIndexBuffer :: MonadManaged m => Vulkan.VkPhysicalDevice -> Vulkan.VkDevice -> m Vulkan.VkBuffer
 --managedIndexBuffer pdev dev = managedBuffer pdev dev [] Vulkan.VK_BUFFER_USAGE_INDEX_BUFFER_BIT

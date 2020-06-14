@@ -77,15 +77,15 @@ pieP = do
   _ <- intP <* newline
   _ <- string "LEVELS" <* skipSpaces
   _levelCount <- intP <* newline
-  pieLevels <- some levelP
+  pieLevels <- some (levelP pieVersion)
   pure $ Pie pieVersion textureName pieLevels
 
-levelP :: Parser PieLevel
-levelP = do
+levelP :: Int -> Parser PieLevel
+levelP pieVersion = do
   _ <- string "LEVEL" <* skipSpaces
   _n <- intP <* newline
   points <- label "points" $ takeMany "POINTS" pointP
-  polygons <- label "polygons" $ takeMany "POLYGONS" polygonP
+  polygons <- label "polygons" $ takeMany "POLYGONS" (polygonP pieVersion)
   connectors <- optional $ label "connectors" $ takeMany "CONNECTORS" connectorP
   animation <- optional (label "animation" animationP)
   pure (PieLevel points polygons animation (fromMaybe [] connectors))
@@ -100,10 +100,10 @@ connectorP :: Parser Connector
 connectorP = tab *> v3FloatP <* newline
 
 pointP :: Parser Vertex
-pointP = tab *> v3FloatP <* newline
+pointP = tab *> fmap (*0.1) v3FloatP <* newline
 
-polygonP :: Parser Triangle
-polygonP = do
+polygonP :: Int -> Parser Triangle
+polygonP pieVersion = do
   void tab
   _flags <- intP
   _vertexCount <- intP
@@ -111,8 +111,10 @@ polygonP = do
   uv1 <- v2FloatP
   uv2 <- v2FloatP
   uv3 <- v2FloatP
-  void newline
-  pure $ Triangle indices (V3 uv1 uv2 uv3)
+  (void newline <|> eof)
+  case pieVersion of
+    3 -> pure $ Triangle indices (V3 uv1 uv2 uv3)
+    2 -> pure $ Triangle indices (V3 (uv1/256.0) (uv2/256.0) (uv3/256.0))
 
 animationP :: Parser Animation
 animationP = do

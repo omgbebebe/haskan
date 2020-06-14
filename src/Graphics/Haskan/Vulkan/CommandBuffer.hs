@@ -85,8 +85,8 @@ withCommandBuffer' commandBuffer flags action =
 
   in (begin *> action <* end)
 
-cmdDraw :: MonadIO m => Vulkan.VkCommandBuffer -> m ()
-cmdDraw commandBuffer = liftIO $ Vulkan.vkCmdDrawIndexed commandBuffer 18 1 0 0 0
+cmdDraw :: MonadIO m => Vulkan.VkCommandBuffer -> Int -> m ()
+cmdDraw commandBuffer indexCount = liftIO $ Vulkan.vkCmdDrawIndexed commandBuffer (fromIntegral indexCount) 1 0 0 0
 
 copyBuffer
   :: MonadIO m

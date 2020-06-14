@@ -55,6 +55,7 @@ createRenderContext
   -> [Vulkan.VkSemaphore]
   -> [Vulkan.VkBuffer]
   -> [Vulkan.VkBuffer]
+  -> Int
   -> m RenderContext
 createRenderContext
   pdev
@@ -70,7 +71,8 @@ createRenderContext
   renderFinishedFences
   renderFinishedSemaphores
   vertexBuffers
-  indexBuffers = do
+  indexBuffers
+  indexCount = do
   let depthFormat = Vulkan.VK_FORMAT_D32_SFLOAT
       format = Vulkan.getField @"format" Swapchain.surfaceFormat
   surfaceExtent <- PhysicalDevice.surfaceExtent pdev surface
@@ -121,7 +123,7 @@ createRenderContext
        for_ indexBuffers $ \indexBuffer -> liftIO $
          Vulkan.vkCmdBindIndexBuffer cb indexBuffer 0 Vulkan.VK_INDEX_TYPE_UINT32
 
-       CommandBuffer.cmdDraw cb
+       CommandBuffer.cmdDraw cb indexCount
       )
     )
 

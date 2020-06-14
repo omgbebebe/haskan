@@ -40,6 +40,7 @@ library
                        Graphics.Haskan.Events
                        Graphics.Haskan.Resources
                        Graphics.Haskan.Logger
+                       Graphics.Haskan.Model
                        Graphics.Haskan.Utils
                        Graphics.Haskan.Utils.PieLoader
                        Graphics.Haskan.Vertex

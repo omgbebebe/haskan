@@ -81,6 +81,9 @@ import           Graphics.Haskan.Vulkan.Types (RenderContext(..))
 import           Graphics.Haskan.Vertex (Vertex(..))
 import qualified Graphics.Haskan.Window as Window
 
+import qualified Graphics.Haskan.Model as Model
+import qualified Graphics.Haskan.Utils.PieLoader as PieLoader
+
 data Action
   = MoveForward
   | MoveBackward
@@ -136,7 +139,7 @@ data ControlMessage
 mainLoop :: MonadIO m => EngineConfig -> m ()
 mainLoop EngineConfig{..} = do
   logI "starting mainLoop"
-  camera <- liftIO $ STM.newTVarIO (Camera (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0))
+  camera <- liftIO $ STM.newTVarIO (Camera (V3 0.0 30.0 (-15.0)) (V3 0.0 0.0 0.0))
   isRunning <- liftIO $ STM.newTVarIO True
 
   controlChannel <- liftIO $ TChan.newBroadcastTChanIO
@@ -251,8 +254,10 @@ renderFrameLoop ctx@RenderContext{..} frameNumber targetFPS imageAvailableSemaph
     Nothing -> do
       let imageAvailableSemaphore = imageAvailableSemaphores !! (frameNumber)
       camera <- liftIO $ STM.readTVarIO tvCamera
-      let newMVP = mvpMatrix (coerce (camPos camera)) (coerce (camLookAt camera))
-      Buffer.updateUniformBuffer device mvpMemory newMVP
+      let model = modelMatrix
+          view = viewMatrix (coerce (camPos camera)) (coerce (camLookAt camera))
+          projection = projectionMatrix
+      Buffer.updateUniformBuffer device mvpMemory [model, view, projection]
       res <- liftIO $ drawFrame ctx imageAvailableSemaphore frameNumber
       case res of
         Render.FrameOk imageIndex -> do
@@ -328,6 +333,8 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   renderFinishedSemaphores <- replicateM 4 (Semaphore.managedSemaphore device)
   renderFinishedFences <- replicateM Render.maxFramesInFlight (Fence.managedFence device)
 
+  mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/blbrbgen.pie"
+  {-
   let
     zPos1 = ( 5)
     zPos2 = ( 3)
@@ -358,25 +365,25 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
       , 8, 9, 10
       , 10, 11, 8
       ]
-
+-}
   vertexBuffer <-
     Buffer.managedVertexBuffer
     physicalDevice
     device
-    vertices
+    (Model.vertices mesh)
 
   indexBuffer <-
     Buffer.managedIndexBuffer
     physicalDevice
     device
-    indices
+    (Model.indices mesh)
 
 
   (mvpBuffer, mvpMemory) <-
     Buffer.managedUniformBuffer
        physicalDevice
        device
-       [ mvpMatrix (V3 0.0 0.0 (-5.0)) (V3 0.0 0.0 0.0)]
+       [ modelMatrix, viewMatrix (V3 0.0 10.0 (-5.0)) (V3 0.0 0.0 0.0), projectionMatrix ]
 
   textureCommandBuffer <- CommandBuffer.createCommandBuffer device graphicsCommandPool
   textureImageView <-
@@ -414,6 +421,7 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
       renderFinishedSemaphores
       [vertexBuffer]
       [indexBuffer]
+      (length (Model.indices mesh))
 
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
   worldState <- liftIO $ STM.readTVarIO (world gameState)
@@ -434,24 +442,26 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   logI "renderLoop finished"
   liftIO $ putMVar finishedSemaphore ()
 
-mvpMatrix :: V3 Foreign.C.CFloat -> V3 Foreign.C.CFloat -> M44 Foreign.C.CFloat
-mvpMatrix eyePos target =
+modelMatrix :: M44 Foreign.C.CFloat
+modelMatrix = Linear.Matrix.transpose $
   let
-    view =
-      Linear.Projection.lookAt eyePos target (V3 0.0 (-1.0) 0.0)
-    model =
-      let
-        rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
-        translate = identity & translation .~ V3 0 0 (5.0)
-      in translate !*! rotate
-    projection =
-      Linear.Projection.perspective
-      (pi / 6) -- FOV
-      (16/9) -- aspect ratio
-      0.01 -- near plane
-      100.0 -- far plane
+    rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
+    translate = identity & translation .~ V3 0 0 (5.0)
+  in translate !*! rotate
 
-  in Linear.Matrix.transpose (projection !*! view !*! model)
+viewMatrix :: V3 Foreign.C.CFloat -> V3 Foreign.C.CFloat -> M44 Foreign.C.CFloat
+viewMatrix eyePos target = Linear.Matrix.transpose $
+  Linear.Projection.lookAt eyePos target (V3 0.0 (-1.0) 0.0)
+
+projectionMatrix :: M44 Foreign.C.CFloat
+projectionMatrix = Linear.Matrix.transpose $
+  Linear.Projection.perspective
+    (pi / 6) -- FOV
+    (16/9) -- aspect ratio
+    0.01 -- near plane
+    100.0 -- far plane
+
+--  in Linear.Matrix.transpose (projection !*! view !*! model)
 
 stateUpdateLoop :: MonadIO m => Integer -> GameState -> MVar () -> TQueue ActionEvent -> TChan ControlMessage -> m ()
 stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel = liftIO $ do
