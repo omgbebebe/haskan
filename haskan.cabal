@@ -41,6 +41,7 @@ library
                        Graphics.Haskan.Resources
                        Graphics.Haskan.Logger
                        Graphics.Haskan.Utils
+                       Graphics.Haskan.Utils.PieLoader
                        Graphics.Haskan.Vertex
                        Graphics.Haskan.Vulkan.Buffer
                        Graphics.Haskan.Vulkan.CommandBuffer
@@ -79,8 +80,10 @@ library
                      , lens
                      , linear
                      , managed >=1.0.7
+                     , megaparsec
                      , pretty-simple
                      , say
+                     , scientific
                      , sdl2 >=2.5.2
                      , stm >=2.5
                      , text

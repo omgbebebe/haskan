@@ -357,7 +357,7 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
 
       , 8, 9, 10
       , 10, 11, 8
-              ]
+      ]
 
   vertexBuffer <-
     Buffer.managedVertexBuffer
