@@ -336,6 +336,7 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/blbrbgen.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/blhq4.pie"
   mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/drhbod10.pie"
+  --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/cube.pie"
   {-
   let
     zPos1 = ( 5)
@@ -392,7 +393,8 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
     Texture.managedTexture
     physicalDevice
     device
-    "data/texture/redbricks2b/redbricks2b-albedo.png"
+--    "data/texture/redbricks2b/redbricks2b-albedo.png"
+    "data/texture/page-14-droid-hubs.png"
     graphicsQueueHandler
     textureCommandBuffer
 
@@ -445,13 +447,12 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   liftIO $ putMVar finishedSemaphore ()
 
 modelMatrix :: M44 Foreign.C.CFloat
-modelMatrix = Linear.Matrix.transpose $
-{-  let
+modelMatrix =
+  let
     rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
     translate = identity & translation .~ V3 0 0 (5.0)
-  in Linear.Matrix.identity -- translate !*! rotate
-  -}
-  Linear.Matrix.identity
+  in Linear.Matrix.transpose $ translate !*! rotate
+--  Linear.Matrix.identity
 
 viewMatrix :: V3 Foreign.C.CFloat -> V3 Foreign.C.CFloat -> M44 Foreign.C.CFloat
 viewMatrix eyePos target = Linear.Matrix.transpose $
@@ -597,7 +598,7 @@ mouseMotionToAction :: SDL.MouseMotionEventData -> Maybe ActionEvent
 mouseMotionToAction (SDL.MouseMotionEventData _window _mouseDevice _mouseButtons _absolutePosition relativePosition) =
   let
     (SDL.V2 relX relY) = relativePosition
-  in Just ((MouseMove (V2 (fromIntegral relX) (fromIntegral relY))), True)
+  in Just ((MouseMove (V2 (fromIntegral (relX*10)) (fromIntegral (relY*10)))), True)
  
 keyToAction :: SDL.KeyboardEventData -> Maybe ActionEvent
 keyToAction (SDL.KeyboardEventData _window motion isRepeated keysym)

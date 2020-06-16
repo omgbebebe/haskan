@@ -14,15 +14,20 @@ layout(location = 3) in uvec4 inColor;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec2 fragTexCoord;
-layout(location = 2) out vec3 viewPosition;
+layout(location = 2) out vec3 flatNormal;
 layout(location = 3) out vec3 fragPos;
+layout(location = 4) out vec3 lightPos;
+
+vec3 constLightPos = vec3( 10.0, -30.0, -15.0);
 
 void main() {
 //    gl_Position = ubo.mvp * vec4(inPosition, 1.0);
     gl_Position = ubo.projection * ubo.view * ubo.model * vec4(inPosition, 1.0);
     fragColor = inColor * vec4(1.0 / 255.0);
     fragTexCoord = inTexCoord;
-//    normal = mat3(transpose(inverse(ubo.model))) * inNormal;
+    flatNormal = mat3(transpose(inverse(ubo.model))) * inNormal;
     mat4 mv = ubo.view * ubo.model;
-    viewPosition = (mv * vec4(inPosition, 1.0)).xyz;
+    fragPos = (mv * vec4(inPosition, 1.0)).xyz;
+//    flatNormal = inNormal;
+    lightPos = (mv * vec4(constLightPos, 1.0)).xyz;
 }
