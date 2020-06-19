@@ -42,6 +42,7 @@ library
                        Graphics.Haskan.Logger
                        Graphics.Haskan.Model
                        Graphics.Haskan.Utils
+                       Graphics.Haskan.Utils.ObjLoader
                        Graphics.Haskan.Utils.PieLoader
                        Graphics.Haskan.Vertex
                        Graphics.Haskan.Vulkan.Buffer
@@ -75,6 +76,7 @@ library
                      , bytestring
                      , co-log >= 0.4 && <0.5
                      , clock >=0.8
+                     , containers
                      , contravariant
                      , hashable
                      , JuicyPixels >=3.3.5
