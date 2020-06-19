@@ -38,8 +38,10 @@ library
   exposed-modules:     Graphics.Haskan
                        Graphics.Haskan.Engine
                        Graphics.Haskan.Events
+                       Graphics.Haskan.Face
                        Graphics.Haskan.Resources
                        Graphics.Haskan.Logger
+                       Graphics.Haskan.Mesh
                        Graphics.Haskan.Model
                        Graphics.Haskan.Utils
                        Graphics.Haskan.Utils.ObjLoader

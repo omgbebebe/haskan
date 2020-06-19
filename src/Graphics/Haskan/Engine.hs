@@ -59,7 +59,10 @@ import qualified Graphics.Vulkan.Ext as Vulkan
 
 -- haskan
 import qualified Graphics.Haskan.Events as Events
+import qualified Graphics.Haskan.Face as Face
 import           Graphics.Haskan.Logger (logI, showT)
+import qualified Graphics.Haskan.Mesh as Mesh
+import qualified Graphics.Haskan.Model as Model
 import           Graphics.Haskan.Resources (throwVkResult)
 import           Graphics.Haskan.Vulkan.Render (drawFrame, presentFrame)
 import qualified Graphics.Haskan.Vulkan.Buffer as Buffer
@@ -81,7 +84,7 @@ import           Graphics.Haskan.Vulkan.Types (RenderContext(..))
 import           Graphics.Haskan.Vertex (Vertex(..))
 import qualified Graphics.Haskan.Window as Window
 
-import qualified Graphics.Haskan.Model as Model
+import qualified Graphics.Haskan.Utils.ObjLoader as ObjLoader
 import qualified Graphics.Haskan.Utils.PieLoader as PieLoader
 
 data Action
@@ -335,8 +338,11 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
 
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/blbrbgen.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/blhq4.pie"
-  mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/drhbod10.pie"
+  --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/drhbod10.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/cube.pie"
+  --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/torus.obj"
+  --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/suzanne_subdiv1.obj"
+  (mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/cube.obj"
   {-
   let
     zPos1 = ( 5)
@@ -373,13 +379,13 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
     Buffer.managedVertexBuffer
     physicalDevice
     device
-    (Model.vertices mesh)
+    (Mesh.vertices mesh)
 
   indexBuffer <-
     Buffer.managedIndexBuffer
     physicalDevice
     device
-    (Model.indices mesh)
+    (Mesh.indices mesh)
 
 
   (mvpBuffer, mvpMemory) <-
@@ -425,7 +431,7 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
       renderFinishedSemaphores
       [vertexBuffer]
       [indexBuffer]
-      (length (Model.indices mesh))
+      (length (Mesh.indices mesh))
 
   -- need to fetch RenderContext from Managed monad to allow proper resource deallocation
   worldState <- liftIO $ STM.readTVarIO (world gameState)

@@ -22,6 +22,10 @@ import Data.Scientific (toRealFloat)
 import Data.Text (Text)
 import qualified Data.Text.IO as T
 
+-- haskan
+import qualified Graphics.Haskan.Vertex as Haskan
+
+
 type Vertex = V3 Float
 type Normal = V3 Float
 type UV = V2 Float
@@ -109,7 +113,7 @@ faceTripletP = do
   index <- uintP <* char '/'
   uv <- uintP <* char '/'
   normal <- uintP
-  pure (fromIntegral index, fromIntegral uv, fromIntegral normal)
+  pure (fromIntegral (index-1), fromIntegral (uv-1), fromIntegral (normal-1))
 
 skipSpaces :: Parser ()
 skipSpaces = skipMany separatorChar
