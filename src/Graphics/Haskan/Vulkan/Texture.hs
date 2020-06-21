@@ -89,15 +89,15 @@ managedTexture pdev dev filePath queue commandBuffer = do
       &* set @"pQueueFamilyIndices" Vulkan.VK_NULL
       )
 
-  image <- allocaAndPeek
-    (Vulkan.vkCreateImage dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)
---    (\ptr -> Vulkan.VkDestroyImage dev ptr Vulkan.vkNullPtr)
+  image <- alloc "texture image"
+    (allocaAndPeek (Vulkan.vkCreateImage dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr))
+    (\ptr -> Vulkan.vkDestroyImage dev ptr Vulkan.vkNullPtr)
 
   imageMemoryRequirements <- allocaAndPeek_
     (Vulkan.vkGetImageMemoryRequirements dev image)
 
   imageMemory <-
-    Haskan.allocateMemoryFor pdev dev imageMemoryRequirements [Vulkan.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT]
+    Haskan.managedMemoryFor pdev dev imageMemoryRequirements [Vulkan.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT]
 
   bindImageMemory dev image imageMemory 0
 
