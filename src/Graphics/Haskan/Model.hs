@@ -33,6 +33,31 @@ objTorus = Obj.parseObj "data/models/torus.obj"
 suzanneCube :: IO Obj.Obj
 suzanneCube = Obj.parseObj "data/models/suzanne_subdiv1.obj"
 
+
+{-
+nor =
+  let
+    faces = [(1 :: Int,5,7,3),(4,3,7,8),(8,7,5,6),(6,2,4,7),(2,1,3,4),(6,5,1,2)]
+    hash = foldl
+      (\h f@(a,b,c,d) ->
+         foldl(\h' k -> HashMap.insertWith (<>) k [rotTo k f] h') h [a,b,c,d]
+      ) HashMap.empty faces
+    faces' = HashMap.foldlWithKey'
+      (\a k v ->
+         if any id $ map (flip elem a) v
+         then a
+         else (head v:a)
+      ) [] hash
+  in faces'
+  where
+    indexOf x (a,b,c,d) = elemIndex x [a,b,c,d]
+
+    rotTo x f =
+      case indexOf x f of
+        Just n -> rot4 n f
+        Nothing -> error "element not found"
+-}
+ 
 --fromObj :: Obj.Obj -> Mesh
 fromObj Obj.Obj{..} =
   let
