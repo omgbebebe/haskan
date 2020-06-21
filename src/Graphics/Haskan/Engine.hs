@@ -218,13 +218,23 @@ mainLoop EngineConfig{..} = do
       unless ( quitting ) inputLoop
 
   inputLoop
-
+{-
+  liftIO $ Async.withAsync
+    (runManaged (renderLoop physicalDevice surface layers targetRenderFPS gameState renderLoopFinished controlChannel)) $ \render ->
+      Async.withAsync (stateUpdateLoop targetPhysicsFPS gameState stateUpdateLoopFinished actionQueue controlChannel) $ \updater -> do
+        inputLoop
+        logI "sending Terminate message"
+        liftIO $ STM.atomically $ TChan.writeTChan controlChannel Terminate
+        Async.waitBoth render updater
+-}
   logI "sending Terminate message"
   liftIO $ STM.atomically $ TChan.writeTChan controlChannel Terminate
   logI "waiting for other threads finished"
   liftIO $ Async.forConcurrently_ [renderLoopFinished, stateUpdateLoopFinished] $ \sem -> do
     takeMVar sem
 
+  logI "destroying SDL window"
+  SDL.destroyWindow window
   SDL.quit
 --  inputLoopFinished <- liftIO $ newEmptyMVar
 --  _ <- liftIO $ forkIO (runManaged $ inputLoop targetInputFPS inputLoopFinished actionQueue controlChannel)
