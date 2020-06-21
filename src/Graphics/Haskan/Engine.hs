@@ -58,6 +58,8 @@ import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 
 -- haskan
+import Graphics.Haskan.Camera (Camera(..))
+import qualified Graphics.Haskan.Camera as Camera
 import qualified Graphics.Haskan.Events as Events
 import qualified Graphics.Haskan.Face as Face
 import           Graphics.Haskan.Logger (logI, showT)
@@ -114,18 +116,27 @@ data FrameTime =
            } deriving (Show)
 
 type Position = V3 Float
+type Distance = Float
+type Orientation = (Linear.Quaternion.Quaternion Float)
 
-data Camera =
-  Camera { camPos :: Position
-         , camLookAt :: Position
-         }
+{-
+data Camera
+  = LookAt { camPos :: Position
+           , camLookAt :: Position
+           }
+  | Orbital { camTarget :: Position
+            , camDistance :: Distance
+            , camOrientation :: Orientation
+            , camDumping :: Maybe (V2 Float)
+            }
+-}
 
-data WorldState =
-  WorldState { activeCamera :: TVar Camera
+data Camera cam => WorldState cam =
+  WorldState { activeCamera :: TVar cam
              }
 
-data GameState =
-  GameState { world :: TVar WorldState
+data GameState cam =
+  GameState { world :: TVar (WorldState cam)
             , isRunning :: TVar Bool
             , moveForward :: TVar Bool
             , moveBackward :: TVar Bool
@@ -142,7 +153,7 @@ data ControlMessage
 mainLoop :: MonadIO m => EngineConfig -> m ()
 mainLoop EngineConfig{..} = do
   logI "starting mainLoop"
-  camera <- liftIO $ STM.newTVarIO (Camera (V3 0.0 30.0 (-15.0)) (V3 0.0 0.0 0.0))
+  camera <- liftIO $ STM.newTVarIO (Camera.defaultOrbitalCamera)
   isRunning <- liftIO $ STM.newTVarIO True
 
   controlChannel <- liftIO $ TChan.newBroadcastTChanIO
@@ -241,14 +252,14 @@ mainLoop EngineConfig{..} = do
   logI "mainLoop finished"
 
 renderFrameLoop
-  :: (MonadFail m, MonadIO m)
+  :: (MonadFail m, MonadIO m, Camera cam)
   => RenderContext
   -> Int
   -> Integer
   -> [Vulkan.VkSemaphore]
   -> TChan ControlMessage
   -> Vulkan.VkDeviceMemory
-  -> TVar Camera
+  -> TVar cam
   -> m Bool
 renderFrameLoop ctx@RenderContext{..} frameNumber targetFPS imageAvailableSemaphores control mvpMemory tvCamera = do
   frameStartTime <- liftIO $ toNanoSecs <$> getTime Monotonic
@@ -258,7 +269,7 @@ renderFrameLoop ctx@RenderContext{..} frameNumber targetFPS imageAvailableSemaph
       let imageAvailableSemaphore = imageAvailableSemaphores !! (frameNumber)
       camera <- liftIO $ STM.readTVarIO tvCamera
       let model = modelMatrix
-          view = viewMatrix (coerce (camPos camera)) (coerce (camLookAt camera))
+          view = Camera.unViewMatrix (Camera.toMatrix camera) --viewMatrix (coerce (camPos camera)) (coerce (camLookAt camera))
           projection = projectionMatrix
       Buffer.updateUniformBuffer device mvpMemory [model, view, projection]
       res <- liftIO $ drawFrame ctx imageAvailableSemaphore frameNumber
@@ -304,12 +315,12 @@ renderFrameLoop ctx@RenderContext{..} frameNumber targetFPS imageAvailableSemaph
 
 --renderLoop :: MonadIO m => Integer -> RenderContext -> GameState -> MVar () -> TChan ControlMessage -> (String -> IO ()) -> m ()
 renderLoop
-  :: (MonadFail m, MonadManaged m)
+  :: (Camera cam, MonadFail m, MonadManaged m)
   => Vulkan.VkPhysicalDevice
   -> Vulkan.VkSurfaceKHR
   -> [String]
   -> Integer
-  -> GameState
+  -> GameState cam
   -> MVar ()
   -> TChan ControlMessage
   -> m ()
@@ -341,8 +352,8 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/drhbod10.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/cube.pie"
   --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/torus.obj"
-  --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/suzanne_subdiv1.obj"
-  (mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/cube.obj"
+  (mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/suzanne_subdiv1.obj"
+  --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/cube.obj"
   {-
   let
     zPos1 = ( 5)
@@ -455,8 +466,10 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
 modelMatrix :: M44 Foreign.C.CFloat
 modelMatrix =
   let
-    rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
-    translate = identity & translation .~ V3 0 0 (5.0)
+    --rotate = m33_to_m44 (fromQuaternion (Linear.Quaternion.axisAngle (V3 1.0 1.0 0.0) (pi / 12)))
+    --translate = identity & translation .~ V3 0 0 (5.0)
+    rotate = identity
+    translate = identity
   in Linear.Matrix.transpose $ translate !*! rotate
 --  Linear.Matrix.identity
 
@@ -467,14 +480,14 @@ viewMatrix eyePos target = Linear.Matrix.transpose $
 projectionMatrix :: M44 Foreign.C.CFloat
 projectionMatrix = Linear.Matrix.transpose $
   Linear.Projection.perspective
-    (pi / 6) -- FOV
+    (pi / 12) -- FOV
     (16/9) -- aspect ratio
     0.01 -- near plane
     100.0 -- far plane
 
 --  in Linear.Matrix.transpose (projection !*! view !*! model)
 
-stateUpdateLoop :: MonadIO m => Integer -> GameState -> MVar () -> TQueue ActionEvent -> TChan ControlMessage -> m ()
+stateUpdateLoop :: (Camera cam, MonadIO m) => Integer -> GameState cam -> MVar () -> TQueue ActionEvent -> TChan ControlMessage -> m ()
 stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel = liftIO $ do
   control <- STM.atomically $ TChan.dupTChan controlChannel
 
@@ -483,7 +496,7 @@ stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel
       camSpeed = 10
 
   let
-    loop :: MonadIO m => Integer -> GameState -> Integer -> m ()
+    loop :: (Camera cam, MonadIO m) => Integer -> GameState cam -> Integer -> m ()
     loop tFPS _gameState prevTime = liftIO $ do
       maybeControlMessage <- STM.atomically $ TChan.tryReadTChan control
       case maybeControlMessage of
@@ -503,13 +516,10 @@ stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel
                 STM.atomically
                   (
                     updateCamera (activeCamera worldState)
-                      id
-                      (\v ->
-                         let
-                           relX = fromIntegral x
-                           relY = fromIntegral y
-                         in v + (V3 (relX/frameDelay) (relY/frameDelay) 0.0)
-                      )
+                      [Camera.Rotate (
+                          V3 ((fromIntegral x)/frameDelay) ((fromIntegral y)/frameDelay) 0.0
+                          )
+                      ]
                   )
               (Escape, _) -> STM.atomically $ STM.writeTVar (isRunning gameState) False
           let dt = newTime - prevTime
@@ -521,11 +531,12 @@ stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel
             d <- STM.readTVar (strafeRight gameState)
             e <- STM.readTVar (isRunning gameState)
             pure (a,b,c,d,e)
-           
-          when (fwd) $ STM.atomically $ updateCamera (activeCamera worldState) (\v -> v + (V3 0.0 0.0 (camSpeed/frameDelay))) id
-          when (bwd) $ STM.atomically $ updateCamera (activeCamera worldState) (\v -> v - (V3 0.0 0.0 (camSpeed/frameDelay))) id
-          when (sl) $ STM.atomically $ updateCamera (activeCamera worldState) (\v -> v - (V3 (camSpeed/frameDelay) 0.0 0.0)) id
-          when (sr) $ STM.atomically $ updateCamera (activeCamera worldState) (\v -> v + (V3 (camSpeed/frameDelay) 0.0 0.0)) id
+
+          let camMove = camSpeed / frameDelay
+          when (fwd) $ STM.atomically $ updateCamera (activeCamera worldState) [Camera.MoveY (camMove)]
+          when (bwd) $ STM.atomically $ updateCamera (activeCamera worldState) [Camera.MoveY (-camMove)]
+          when (sl) $ STM.atomically $ updateCamera (activeCamera worldState) [Camera.MoveX camMove]
+          when (sr) $ STM.atomically $ updateCamera (activeCamera worldState) [Camera.MoveX (-camMove)]
           threadDelay (round frameDelay)
           when isRunning $ loop (tFPS) _gameState newTime
         Just Terminate -> do
@@ -538,12 +549,12 @@ stateUpdateLoop targetFPS gameState finishedSemaphore actionQueue controlChannel
 
 
 updateCamera
-  :: TVar Camera
-  -> (Position -> Position)
-  -> (Position -> Position)
+  :: Camera cam
+  => TVar cam
+  -> [Camera.Modifier Foreign.C.CFloat]
   -> STM ()
-updateCamera tvCamera positionModifier lookAtModifier = STM.modifyTVar' tvCamera $
-  \camera@Camera{..} -> camera{camPos = positionModifier camPos, camLookAt = lookAtModifier camLookAt}
+updateCamera tvCamera mods = STM.modifyTVar' tvCamera $
+  \cam -> Camera.update cam mods
 
 data Event
 
@@ -575,7 +586,7 @@ defaultBindings = HashMap.fromList
   , ( ([LShift], SDL.KeycodeQ), Escape )
   ]
  
-updateGameState :: TVar GameState -> TQueue Event -> STM ()
+updateGameState :: Camera cam => TVar (GameState cam) -> TQueue Event -> STM ()
 updateGameState gameState tqEvents = do
   events <- TQueue.flushTQueue tqEvents
   pure ()

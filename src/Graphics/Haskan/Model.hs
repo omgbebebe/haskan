@@ -62,7 +62,7 @@ fromObj Obj.Obj{..} =
            v1 = v !! i1
            v2 = v !! i2
            v3 = v !! i3
-           normal = calcNormal v1 v2 v3
+           normal = calcNormal v3 v2 v1
          in (HashMap.update (\v -> Just (v{vNorm = normal})) i1 vertices, qf)
       ) vertexMap normalizedFaces
     vertices = map snd $ sortOn fst $ HashMap.toList vertexMap'

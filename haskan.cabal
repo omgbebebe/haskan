@@ -36,6 +36,7 @@ library
                        RecordWildCards
                        TypeApplications
   exposed-modules:     Graphics.Haskan
+                       Graphics.Haskan.Camera
                        Graphics.Haskan.Engine
                        Graphics.Haskan.Events
                        Graphics.Haskan.Face
