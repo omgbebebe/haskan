@@ -29,5 +29,5 @@ void main() {
     mat4 mv = ubo.view * ubo.model;
     fragPos = (mv * vec4(inPosition, 1.0)).xyz;
 //    flatNormal = inNormal;
-    lightPos = (mv * vec4(constLightPos, 1.0)).xyz;
+    lightPos = (vec4(constLightPos, 1.0)).xyz;
 }

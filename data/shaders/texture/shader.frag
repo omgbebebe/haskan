@@ -24,7 +24,7 @@ void main() {
     vec3 lightDir = normalize (lightPos - fragPos);
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
-    vec3 objColor = fragColor.rgb; //texture(texSampler, fragTexCoord).rgb;
+    vec3 objColor = texture(texSampler, fragTexCoord).rgb;
     vec3 result = (ambient + diffuse) * objColor;
     outColor = vec4(result, 1.0);
     //outColor = vec4((flatNormal+1.0)/2.0, 1.0);

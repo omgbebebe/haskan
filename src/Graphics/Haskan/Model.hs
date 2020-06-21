@@ -33,6 +33,13 @@ objTorus = Obj.parseObj "data/models/torus.obj"
 suzanneCube :: IO Obj.Obj
 suzanneCube = Obj.parseObj "data/models/suzanne_subdiv1.obj"
 
+{-
+data Model =
+  Model { mesh :: Mesh
+        , transformation :: M44 Foreign.C.CFloat
+        , material :: Material
+        } deriving (Show)
+-}
 
 {-
 nor =

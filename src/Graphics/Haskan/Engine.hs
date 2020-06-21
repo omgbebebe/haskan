@@ -351,8 +351,9 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/blhq4.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/drhbod10.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/cube.pie"
-  --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/torus.obj"
-  (mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/suzanne_subdiv1.obj"
+  (mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/torus.obj"
+  --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/bmw27.obj"
+  --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/suzanne_subdiv1.obj"
   --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/cube.obj"
   {-
   let
@@ -403,7 +404,7 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
     Buffer.managedUniformBuffer
        physicalDevice
        device
-       [ modelMatrix, viewMatrix (V3 0.0 10.0 (-5.0)) (V3 0.0 0.0 0.0), projectionMatrix ]
+       [ modelMatrix, identity, projectionMatrix ]
 
   textureCommandBuffer <- CommandBuffer.createCommandBuffer device graphicsCommandPool
   textureImageView <-
@@ -473,17 +474,18 @@ modelMatrix =
   in Linear.Matrix.transpose $ translate !*! rotate
 --  Linear.Matrix.identity
 
+{-
 viewMatrix :: V3 Foreign.C.CFloat -> V3 Foreign.C.CFloat -> M44 Foreign.C.CFloat
 viewMatrix eyePos target = Linear.Matrix.transpose $
   Linear.Projection.lookAt eyePos target (V3 0.0 (-1.0) 0.0)
-
+-}
 projectionMatrix :: M44 Foreign.C.CFloat
 projectionMatrix = Linear.Matrix.transpose $
-  Linear.Projection.perspective
+  Linear.Projection.infinitePerspective
     (pi / 12) -- FOV
     (16/9) -- aspect ratio
-    0.01 -- near plane
-    100.0 -- far plane
+    0.1 -- near plane
+--    100.0 -- far plane
 
 --  in Linear.Matrix.transpose (projection !*! view !*! model)
 
