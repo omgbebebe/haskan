@@ -10,6 +10,7 @@ import Control.Monad.Managed (MonadManaged)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
 -- haskan
@@ -39,4 +40,7 @@ createDescriptorPool dev imageViewCount = do
       &* setListRef @"pPoolSizes" [poolSize, samplerPoolSize]
       &* set @"maxSets" (fromIntegral imageViewCount)
       )
-    in liftIO $ allocaAndPeek (Vulkan.vkCreateDescriptorPool dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)
+    in liftIO $ withPtr createInfo
+       (\ciPtr ->
+          allocaAndPeek (Vulkan.vkCreateDescriptorPool dev ciPtr Vulkan.vkNullPtr)
+       )

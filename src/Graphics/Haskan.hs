@@ -15,11 +15,11 @@ data QueueFamily
   | Sparse
 
 --init :: MonadIO m => Text -> m ()
-runHaskan :: Text -> IO ()
-runHaskan title = do
+runHaskan :: Text -> String -> IO ()
+runHaskan title meshName = do
   logI "Initialize Haskan Engine"
   logI "Starting Engine main loop"
-  Engine.mainLoop
+  Engine.mainLoop meshName
     EngineConfig{ targetRenderFPS = 120
                 , targetPhysicsFPS = 100
                 , targetNetworkFPS = 10

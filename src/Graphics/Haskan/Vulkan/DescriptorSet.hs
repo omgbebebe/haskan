@@ -17,7 +17,8 @@ import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal (withPtr)
+import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, setVkRef, (&*))
 
 -- haskan
 import Graphics.Haskan.Resources (alloc, alloc_, allocaAndPeek, allocaAndPeek_, peekVkList, peekVkList_, throwVkResult)
@@ -48,7 +49,7 @@ allocateDescriptorSet dev descriptorPool setLayouts = do
       &* set @"descriptorSetCount" (fromIntegral (length setLayouts))
       &* setListRef @"pSetLayouts" setLayouts
       )
-    in liftIO $ allocaAndPeek (Vulkan.vkAllocateDescriptorSets dev (Vulkan.unsafePtr allocateInfo))
+    in liftIO $ withPtr allocateInfo (\aiPtr -> allocaAndPeek (Vulkan.vkAllocateDescriptorSets dev aiPtr))
 
 updateDescriptorSets
   :: MonadIO m
@@ -80,7 +81,7 @@ updateDescriptorSets dev descriptorSet buffer textureImageView textureSampler = 
       &* set @"descriptorType" Vulkan.VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
       &* set @"pTexelBufferView" Vulkan.VK_NULL
       &* set @"pImageInfo" Vulkan.VK_NULL
-      &* set @"pBufferInfo" (Vulkan.unsafePtr bufferInfo)
+      &* setVkRef @"pBufferInfo" bufferInfo
       &* set @"descriptorCount" 1
       &* set @"dstArrayElement" 0
       )
@@ -93,7 +94,7 @@ updateDescriptorSets dev descriptorSet buffer textureImageView textureSampler = 
       &* set @"descriptorType" Vulkan.VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
       &* set @"pTexelBufferView" Vulkan.VK_NULL
       &* setListRef @"pImageInfo" [textureInfo]
-      &* set @"pBufferInfo" (Vulkan.unsafePtr bufferInfo)
+      &* setVkRef @"pBufferInfo" bufferInfo
       &* set @"descriptorCount" 1
       &* set @"dstArrayElement" 0
       )

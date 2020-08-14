@@ -9,6 +9,7 @@ import Control.Monad.Managed (MonadManaged)
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
 import Graphics.Vulkan.Marshal.Create (set, (&*))
 
@@ -37,4 +38,6 @@ createCommandPool dev queueFamilyIndex = do
       &* set @"queueFamilyIndex" (fromIntegral queueFamilyIndex)
       &* set @"flags" Vulkan.VK_ZERO_FLAGS
       )
-  liftIO $ allocaAndPeek (Vulkan.vkCreateCommandPool dev (Vulkan.unsafePtr commandPoolCI) Vulkan.VK_NULL)
+  liftIO $ withPtr commandPoolCI
+      (\ciPtr -> allocaAndPeek (Vulkan.vkCreateCommandPool dev ciPtr Vulkan.VK_NULL)
+    )

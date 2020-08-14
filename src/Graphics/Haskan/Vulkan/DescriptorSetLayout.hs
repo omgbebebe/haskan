@@ -1,7 +1,7 @@
 module Graphics.Haskan.Vulkan.DescriptorSetLayout where
 
 -- base
-import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 
 -- managed
 import Control.Monad.Managed (MonadManaged)
@@ -10,6 +10,7 @@ import Control.Monad.Managed (MonadManaged)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
 -- haskan
@@ -44,4 +45,7 @@ createDescriptorSetLayout dev = do
       &* set @"bindingCount" 2
       &* setListRef @"pBindings" [ binding, sampler ]
       )
-    in allocaAndPeek (Vulkan.vkCreateDescriptorSetLayout dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)
+    in liftIO $ withPtr createInfo
+       (\ciPtr ->
+          allocaAndPeek (Vulkan.vkCreateDescriptorSetLayout dev ciPtr Vulkan.vkNullPtr)
+       )

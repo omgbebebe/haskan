@@ -15,6 +15,7 @@ import Control.Monad.Managed (MonadManaged)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, (&*))
 
 -- haskan
@@ -45,14 +46,15 @@ allocateMemoryFor pdev dev memoryRequirements memoryRequiredFlags = do
     memoryTypeCount =
       Vulkan.getField @"memoryTypeCount" memoryProperties
 
-  memoryTypes <-
-    liftIO $
-    Foreign.Marshal.peekArray
-      @Vulkan.VkMemoryType
-      ( fromIntegral memoryTypeCount )
-      ( Vulkan.unsafePtr memoryProperties
-        `Foreign.plusPtr` Vulkan.fieldOffset @"memoryTypes" @Vulkan.VkPhysicalDeviceMemoryProperties
-      )
+  memoryTypes <- liftIO $ withPtr memoryProperties
+    (\mpPtr ->
+       Foreign.Marshal.peekArray
+         @Vulkan.VkMemoryType
+         (fromIntegral memoryTypeCount)
+         ( mpPtr
+           `Foreign.plusPtr` Vulkan.fieldOffset @"memoryTypes" @Vulkan.VkPhysicalDeviceMemoryProperties
+         )
+    )
 
   let
     possibleMemoryTypeIndices = do
@@ -86,4 +88,4 @@ allocateMemoryFor pdev dev memoryRequirements memoryRequiredFlags = do
       &* set @"memoryTypeIndex" memoryTypeIndex
       )
 
-  allocaAndPeek (Vulkan.vkAllocateMemory dev (Vulkan.unsafePtr allocateInfo) Vulkan.vkNullPtr)
+  liftIO $ withPtr allocateInfo (\aiPtr -> allocaAndPeek (Vulkan.vkAllocateMemory dev aiPtr Vulkan.vkNullPtr))

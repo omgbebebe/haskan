@@ -128,7 +128,7 @@ createDepthImage dev extent depthFormat = do
       &* set @"imageType" Vulkan.VK_IMAGE_TYPE_2D
       &* set @"extent" depthExtent
       )
-  liftIO $ allocaAndPeek (Vulkan.vkCreateImage dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)
+  liftIO $ withPtr createInfo (\ciPtr -> allocaAndPeek (Vulkan.vkCreateImage dev ciPtr Vulkan.vkNullPtr))
 
 managedDepthView
   :: MonadManaged m

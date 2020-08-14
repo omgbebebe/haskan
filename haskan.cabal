@@ -41,6 +41,7 @@ library
                        Graphics.Haskan.Events
                        Graphics.Haskan.Face
                        Graphics.Haskan.Resources
+                       Graphics.Haskan.Scene
                        Graphics.Haskan.Logger
                        Graphics.Haskan.Mesh
                        Graphics.Haskan.Model
@@ -82,6 +83,7 @@ library
                      , clock >=0.8
                      , containers
                      , contravariant
+                     , dynamic-graphs >=0.1.0.4
                      , hashable
                      , JuicyPixels >=3.3.5
                      , lens

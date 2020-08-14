@@ -11,6 +11,7 @@ import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setAt, setListRef, setVkRef, (&*))
 
 -- haskan
@@ -93,7 +94,7 @@ createRenderPass dev surfaceFormat depthFormat =
       &* set @"dependencyCount" 1
       &* setListRef @"pDependencies" [dependency]
       )
-    in liftIO $ allocaAndPeek (Vulkan.vkCreateRenderPass dev (Vulkan.unsafePtr renderPassCI) Vulkan.VK_NULL)
+    in liftIO $ withPtr renderPassCI (\rpciPtr -> allocaAndPeek (Vulkan.vkCreateRenderPass dev rpciPtr Vulkan.VK_NULL))
 
 withRenderPass
   :: MonadIO m
@@ -134,7 +135,7 @@ withRenderPass commandBuffer renderPass framebuffer extent action =
       &* set @"clearValueCount" 2
       &* setListRef @"pClearValues" [clearColorValue, clearDepthValue]
       )
-    begin = liftIO $ Vulkan.vkCmdBeginRenderPass commandBuffer (Vulkan.unsafePtr beginInfo) Vulkan.VK_SUBPASS_CONTENTS_INLINE
+    begin = liftIO $ withPtr beginInfo (\biPtr -> Vulkan.vkCmdBeginRenderPass commandBuffer biPtr Vulkan.VK_SUBPASS_CONTENTS_INLINE)
     end = liftIO $ Vulkan.vkCmdEndRenderPass commandBuffer
 
   in (begin *> action <* end)

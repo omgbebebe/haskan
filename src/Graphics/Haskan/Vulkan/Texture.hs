@@ -19,6 +19,7 @@ import qualified Data.Vector.Storable as Vector
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create ((&*), set)
 
 -- haskan
@@ -90,7 +91,7 @@ managedTexture pdev dev filePath queue commandBuffer = do
       )
 
   image <- alloc "texture image"
-    (allocaAndPeek (Vulkan.vkCreateImage dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr))
+    (withPtr createInfo (\ciPtr -> allocaAndPeek (Vulkan.vkCreateImage dev ciPtr Vulkan.vkNullPtr)))
     (\ptr -> Vulkan.vkDestroyImage dev ptr Vulkan.vkNullPtr)
 
   imageMemoryRequirements <- allocaAndPeek_
@@ -169,4 +170,4 @@ createSampler dev =
       &* set @"minLod" 0.0
       &* set @"maxLod" 0.0
       )
-  in allocaAndPeek (Vulkan.vkCreateSampler dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr)
+  in liftIO $ withPtr createInfo (\ciPtr -> allocaAndPeek (Vulkan.vkCreateSampler dev ciPtr Vulkan.vkNullPtr))

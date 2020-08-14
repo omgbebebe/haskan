@@ -150,8 +150,8 @@ data ControlMessage
 --mainLoop :: MonadIO m => EventsQueue -> RenderContext -> m ()
 --mainLoop eventsQueue ctx@RenderContext{..} = do
 --mainLoop :: MonadIO m => HaskanConfig -> RenderContext -> m Bool
-mainLoop :: MonadIO m => EngineConfig -> m ()
-mainLoop EngineConfig{..} = do
+mainLoop :: MonadIO m => String -> EngineConfig -> m ()
+mainLoop meshName EngineConfig{..} = do
   logI "starting mainLoop"
   camera <- liftIO $ STM.newTVarIO (Camera.defaultOrbitalCamera)
   isRunning <- liftIO $ STM.newTVarIO True
@@ -189,7 +189,7 @@ mainLoop EngineConfig{..} = do
  
   -- timeNow <- liftIO $ toNanoSecs <$> getTime Monotonic
   renderLoopFinished <- liftIO $ newEmptyMVar
-  _ <- liftIO $ forkIO (runManaged (renderLoop physicalDevice surface layers targetRenderFPS gameState renderLoopFinished controlChannel))
+  _ <- liftIO $ forkIO (runManaged (renderLoop physicalDevice surface layers targetRenderFPS gameState renderLoopFinished controlChannel meshName))
 
   stateUpdateLoopFinished <- liftIO $ newEmptyMVar
   _ <- liftIO $ forkIO (stateUpdateLoop targetPhysicsFPS gameState stateUpdateLoopFinished actionQueue controlChannel)
@@ -333,8 +333,9 @@ renderLoop
   -> GameState cam
   -> MVar ()
   -> TChan ControlMessage
+  -> String
   -> m ()
-renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore controlChannel = do
+renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore controlChannel meshName = do
   control <- liftIO $ STM.atomically $ TChan.dupTChan controlChannel
 
   (device, (graphicsQueueFamilyIndex, presentQueueFamilyIndex)) <- Device.managedRenderDevice physicalDevice surface layers
@@ -361,7 +362,7 @@ renderLoop physicalDevice surface layers targetFPS gameState finishedSemaphore c
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/blhq4.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/drhbod10.pie"
   --mesh <- Model.fromPie . head . PieLoader.levels <$> PieLoader.parsePie "data/models/pie/cube.pie"
-  (mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/torus.obj"
+  (mesh,_) <- Model.fromObj <$> ObjLoader.parseObj ("data/models/obj/" <> meshName)
   --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/bmw27.obj"
   --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/suzanne_subdiv1.obj"
   --(mesh,_) <- Model.fromObj <$> ObjLoader.parseObj "data/models/cube.obj"

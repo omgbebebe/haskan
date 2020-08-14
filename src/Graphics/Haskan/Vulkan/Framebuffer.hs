@@ -10,6 +10,7 @@ import Control.Monad.Managed (MonadManaged)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
 -- haskan
@@ -47,4 +48,4 @@ createFramebuffer dev renderPass extent imageView depthView = do
       &* set @"height" (Vulkan.getField @"height" extent)
       &* set @"layers" 1
       )
-  liftIO $ allocaAndPeek (Vulkan.vkCreateFramebuffer dev (Vulkan.unsafePtr framebufferCI) Vulkan.VK_NULL)
+  liftIO $ withPtr framebufferCI (\fciPtr -> allocaAndPeek (Vulkan.vkCreateFramebuffer dev fciPtr Vulkan.VK_NULL))

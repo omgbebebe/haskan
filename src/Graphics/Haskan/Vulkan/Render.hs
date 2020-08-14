@@ -18,6 +18,7 @@ import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
 -- managed
@@ -169,11 +170,11 @@ renderImage RenderContext{..} imageAvailableSemaphore fenceIndex imageIndex = do
       &* set @"signalSemaphoreCount" 1
       &* setListRef @"pSignalSemaphores" [renderFinishedSemaphore]
       )
-  liftIO $ do
+  liftIO $ withPtr submitInfo $ \siPtr -> do
     Foreign.Marshal.Array.withArray [renderFinishedFence] $ \ptr -> do
       Vulkan.vkWaitForFences device 1 ptr Vulkan.VK_TRUE maxBound >>= throwVkResult
       Vulkan.vkResetFences device 1 ptr >>= throwVkResult
-    Vulkan.vkQueueSubmit graphicsQueueHandler 1 (Vulkan.unsafePtr submitInfo) renderFinishedFence >>= throwVkResult
+    Vulkan.vkQueueSubmit graphicsQueueHandler 1 siPtr renderFinishedFence >>= throwVkResult
   pure (imageIndex)
 
 presentFrame :: MonadIO m => RenderContext -> Vulkan.Word32 -> Vulkan.VkSemaphore -> m Vulkan.VkResult
@@ -189,4 +190,4 @@ presentFrame RenderContext{..} imageIndex renderFinishedSem = do
       &* setListRef @"pImageIndices" [imageIndex]
       &* set @"pResults" Vulkan.vkNullPtr
       )
-  liftIO $ Vulkan.vkQueuePresentKHR presentQueueHandler (Vulkan.unsafePtr presentInfo)
+  liftIO $ withPtr presentInfo (\piPtr -> Vulkan.vkQueuePresentKHR presentQueueHandler piPtr)

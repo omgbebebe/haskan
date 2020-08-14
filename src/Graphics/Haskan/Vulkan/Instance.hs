@@ -26,7 +26,8 @@ import qualified Graphics.Vulkan.Ext as Vulkan
 -- vulkan-api
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
-import Graphics.Vulkan.Marshal.Create (set, setStrListRef, (&*))
+import Graphics.Vulkan.Marshal (withPtr)
+import Graphics.Vulkan.Marshal.Create (set, setStrListRef, setVkRef, (&*))
 
 -- haskan
 import Graphics.Haskan.Resources (alloc, allocaAndPeek, peekVkList)
@@ -88,12 +89,12 @@ createInstance extraExtensions = do
     instanceInfo = Vulkan.createVk
       (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
       &* set @"pNext" Vulkan.VK_NULL
-      &* set @"pApplicationInfo" (Vulkan.unsafePtr appInfo)
+      &* setVkRef @"pApplicationInfo" appInfo
       &* set @"enabledExtensionCount" (fromIntegral (length extensions) )
       &* setStrListRef @"ppEnabledExtensionNames" extensions
       &* set @"enabledLayerCount" (fromIntegral (length layers))
       &* setStrListRef @"ppEnabledLayerNames" (layers)
       )
 
-  inst <- allocaAndPeek (Vulkan.vkCreateInstance (Vulkan.unsafePtr instanceInfo) Vulkan.VK_NULL_HANDLE)
+  inst <- liftIO $ withPtr instanceInfo (\iiPtr -> allocaAndPeek (Vulkan.vkCreateInstance iiPtr Vulkan.VK_NULL_HANDLE))
   pure (inst, layers)

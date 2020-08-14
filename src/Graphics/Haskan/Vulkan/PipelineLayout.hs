@@ -16,6 +16,7 @@ import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Ext.VK_KHR_surface as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
 
 -- haskan
@@ -38,4 +39,4 @@ createPipelineLayout dev descriptorSetLayouts =
       &* set @"pushConstantRangeCount" 0
       &* set @"pPushConstantRanges" Vulkan.VK_NULL
       )
-  in liftIO $ allocaAndPeek $ Vulkan.vkCreatePipelineLayout dev (Vulkan.unsafePtr createInfo) Vulkan.VK_NULL
+  in liftIO $ withPtr createInfo (\ciPtr -> allocaAndPeek $ Vulkan.vkCreatePipelineLayout dev ciPtr Vulkan.VK_NULL)

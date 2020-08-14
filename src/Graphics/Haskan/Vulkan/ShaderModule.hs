@@ -11,6 +11,7 @@ import Control.Monad.Managed (MonadManaged)
 -- vulkan-api
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
 import Graphics.Vulkan.Marshal.Create (set, (&*))
 
@@ -34,4 +35,4 @@ createShaderModule dev path = liftIO $ do
         &* set @"codeSize" (fromIntegral len)
         &* set @"pCode" (Foreign.Ptr.castPtr bytesPtr)
         )
-    in allocaAndPeek (Vulkan.vkCreateShaderModule dev (Vulkan.unsafePtr createInfo) Vulkan.VK_NULL)
+    in liftIO $ withPtr createInfo (\ciPtr -> allocaAndPeek (Vulkan.vkCreateShaderModule dev ciPtr Vulkan.VK_NULL))

@@ -10,6 +10,7 @@ import Control.Monad.Managed (MonadManaged)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, (&*))
 
 -- haskan
@@ -28,4 +29,5 @@ createFence dev =
         &* set @"pNext" Vulkan.vkNullPtr
         &* set @"flags" Vulkan.VK_FENCE_CREATE_SIGNALED_BIT
         )
-  in liftIO $ allocaAndPeek (Vulkan.vkCreateFence dev (Vulkan.unsafePtr createInfo) Vulkan.VK_NULL)
+  in liftIO $ withPtr createInfo
+     (\ ciPtr -> allocaAndPeek (Vulkan.vkCreateFence dev ciPtr Vulkan.VK_NULL))

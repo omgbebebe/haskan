@@ -12,6 +12,7 @@ import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Ext as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, setStrListRef, (&*))
 
 -- haskan
@@ -78,7 +79,7 @@ createDevice dev queueFamilyIndices enabledLayers = do
       &* setListRef @"ppEnabledExtensionNames" enabledExtensions
       &* set        @"pEnabledFeatures" enabledFeatures
       )
-    in liftIO $ allocaAndPeek ( Vulkan.vkCreateDevice dev (Vulkan.unsafePtr createInfo) Vulkan.vkNullPtr )
+    in liftIO $ withPtr createInfo (\ciPtr -> allocaAndPeek ( Vulkan.vkCreateDevice dev ciPtr Vulkan.vkNullPtr ))
 
 getDeviceQueueHandler
   :: MonadIO m

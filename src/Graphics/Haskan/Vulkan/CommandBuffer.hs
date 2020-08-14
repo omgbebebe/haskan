@@ -7,6 +7,7 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setListRef, (&*))
 
 -- haskan
@@ -26,7 +27,7 @@ createCommandBuffer dev commandPool =
       &* set @"level" Vulkan.VK_COMMAND_BUFFER_LEVEL_PRIMARY
       &* set @"commandBufferCount" 1
       )
-  in liftIO $ allocaAndPeek (Vulkan.vkAllocateCommandBuffers dev (Vulkan.unsafePtr createInfo))
+  in liftIO $ withPtr createInfo (\ciPtr -> allocaAndPeek (Vulkan.vkAllocateCommandBuffers dev ciPtr))
 
 {-
 createOneTimeCommandBuffer
@@ -62,9 +63,11 @@ withCommandBufferOneTime queue commandBuffer action = do
       &* set @"pWaitDstStageMask" Vulkan.VK_NULL
       &* set @"pSignalSemaphores" Vulkan.VK_NULL
       )
-  liftIO $ do
-    Vulkan.vkQueueSubmit queue 1 (Vulkan.unsafePtr submitInfo) Vulkan.vkNullPtr
-    Vulkan.vkQueueWaitIdle queue >>= throwVkResult
+  liftIO $ withPtr submitInfo
+    (\siPtr -> do
+        Vulkan.vkQueueSubmit queue 1 siPtr Vulkan.vkNullPtr
+        Vulkan.vkQueueWaitIdle queue >>= throwVkResult
+    )
 
 withCommandBuffer'
   :: MonadIO m
@@ -80,7 +83,10 @@ withCommandBuffer' commandBuffer flags action =
       &* set @"flags" flags --Vulkan.VK_ZERO_FLAGS
       &* set @"pInheritanceInfo" Vulkan.vkNullPtr
       )
-    begin = liftIO $ Vulkan.vkBeginCommandBuffer commandBuffer (Vulkan.unsafePtr commandBufferBeginInfo) >>= throwVkResult
+    begin = liftIO $ withPtr commandBufferBeginInfo
+            (\cbbiPtr ->
+               Vulkan.vkBeginCommandBuffer commandBuffer cbbiPtr >>= throwVkResult
+            )
     end = liftIO $ Vulkan.vkEndCommandBuffer commandBuffer >>= throwVkResult
 
   in (begin *> action <* end)
@@ -104,7 +110,7 @@ copyBuffer queue commandBuffer srcBuffer dstBuffer size = do
       &* set @"dstOffset" 0
       )
   withCommandBufferOneTime queue commandBuffer
-    ( liftIO $ Vulkan.vkCmdCopyBuffer commandBuffer srcBuffer dstBuffer 1 (Vulkan.unsafePtr regionSize) )
+    ( liftIO $ withPtr regionSize (\rsPtr -> Vulkan.vkCmdCopyBuffer commandBuffer srcBuffer dstBuffer 1 rsPtr ))
 
 layerTransition
   :: MonadIO m
@@ -149,13 +155,15 @@ layerTransition commandBuffer image oldLayout newLayout = do
       &* set @"srcAccessMask" srcAccessMask
       &* set @"dstAccessMask" dstAccessMask
       )
-  liftIO $ Vulkan.vkCmdPipelineBarrier
-    commandBuffer
-    srcStage dstStage
-    Vulkan.VK_ZERO_FLAGS
-    0 Vulkan.vkNullPtr
-    0 Vulkan.vkNullPtr
-    1 (Vulkan.unsafePtr barrier)
+  liftIO $ withPtr barrier
+    (\bPtr -> Vulkan.vkCmdPipelineBarrier
+      commandBuffer
+      srcStage dstStage
+      Vulkan.VK_ZERO_FLAGS
+      0 Vulkan.vkNullPtr
+      0 Vulkan.vkNullPtr
+      1 bPtr
+    )
 
 copyBufferToImage
   :: MonadIO m
@@ -191,11 +199,13 @@ copyBufferToImage commandBuffer buffer image width height = do
       &* set @"imageOffset" imageOffset
       &* set @"imageExtent" imageExtent
       )
-  liftIO $
-    Vulkan.vkCmdCopyBufferToImage
-      commandBuffer
-      buffer
-      image
-      Vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
-      1
-      (Vulkan.unsafePtr region)
+  liftIO $ withPtr region
+    (\rPtr ->
+       Vulkan.vkCmdCopyBufferToImage
+         commandBuffer
+         buffer
+         image
+         Vulkan.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+         1
+         rPtr
+    )

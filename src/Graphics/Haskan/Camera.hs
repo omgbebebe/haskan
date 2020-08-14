@@ -68,15 +68,17 @@ orbitalToMatrix OrbitalCamera{..} =
     yAxis = V3 0.0 1.0 0.0
     zAxis = V3 0.0 0.0 1.0
     translation = target - (V3 0.0 0.0 distance)
-    translate = Matrix.identity & Matrix.translation .~ translation
+--    translate = Matrix.identity & Matrix.translation .~ translation
     azimuthRotation = Quat.axisAngle yAxis azimuthAngle
     elevationRotation = Quat.axisAngle xAxis elevationAngle
     quat = elevationRotation * azimuthRotation
-    rotate = Matrix.m33_to_m44 (Matrix.fromQuaternion quat)
+    --rotate = Matrix.m33_to_m44 (Matrix.fromQuaternion quat)
+    rotate = Matrix.mkTransformation quat translation
 --    rotate = Matrix.m33_to_m44 (Matrix.fromQuaternion orientation)
 --    viewMatrix = Matrix.transpose $ Matrix.mkTransformation orientation translation
     --viewMatrix = Matrix.transpose $ Projection.lookAt eyePos target (V3 0.0 1.0 0.0)
-    viewMatrix = Matrix.transpose $ translate !*! rotate
+    --viewMatrix = Matrix.transpose $ translate !*! rotate
+    viewMatrix = Matrix.transpose $ rotate
   in ViewMatrix viewMatrix
 
 instance Camera OrbitalCamera where

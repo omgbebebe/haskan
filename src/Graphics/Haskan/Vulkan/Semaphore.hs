@@ -10,6 +10,7 @@ import Control.Monad.Managed (MonadManaged)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, (&*))
 
 -- haskan
@@ -27,4 +28,7 @@ createSemaphore dev =
         (  set @"sType" Vulkan.VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
         &* set @"pNext" Vulkan.vkNullPtr
         )
-  in liftIO $ allocaAndPeek (Vulkan.vkCreateSemaphore dev (Vulkan.unsafePtr createInfo) Vulkan.VK_NULL)
+  in liftIO $ withPtr createInfo
+     (\ciPtr ->
+         allocaAndPeek (Vulkan.vkCreateSemaphore dev ciPtr Vulkan.VK_NULL)
+     )

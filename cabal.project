@@ -1,2 +1,3 @@
 packages: ./
           ../vulkan-api/vulkan/vulkan-api/
+          ../dynamic-graphs

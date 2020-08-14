@@ -16,6 +16,7 @@ import Control.Monad.Managed (MonadManaged)
 import qualified Graphics.Vulkan as Vulkan
 import qualified Graphics.Vulkan.Core_1_0 as Vulkan
 import qualified Graphics.Vulkan.Marshal.Create as Vulkan
+import Graphics.Vulkan.Marshal (withPtr)
 import Graphics.Vulkan.Marshal.Create (set, setAt, setVkRef, setListRef, setStrRef, (&*))
 
 -- haskan
@@ -233,7 +234,10 @@ createGraphicsPipeline dev layout renderPass vertShader fragShader swapchainExte
       &* set @"basePipelineHandle" basePipelineHandle
       &* set @"basePipelineIndex" basePipelineIndex
       )
-    in liftIO $ allocaAndPeek $ Vulkan.vkCreateGraphicsPipelines dev Vulkan.VK_NULL 1 (Vulkan.unsafePtr pipelineCI) Vulkan.VK_NULL
+    in liftIO $ withPtr pipelineCI
+       (\pciPtr ->
+          allocaAndPeek $ Vulkan.vkCreateGraphicsPipelines dev Vulkan.VK_NULL 1 pciPtr Vulkan.VK_NULL
+       )
 
 cmdBindPipeline :: MonadIO m => Vulkan.VkCommandBuffer -> Vulkan.VkPipeline -> m ()
 cmdBindPipeline commandBuffer pipeline = liftIO $
