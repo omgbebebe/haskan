@@ -17,8 +17,11 @@ build-type:          Simple
 extra-source-files:  CHANGELOG.md
 
 executable haskan
-  ghc-options:         -optl-mconsole -O2 -threaded
---  ghc-options:         -optl-mconsole -O0
+  if os(windows)
+    ghc-options:         -optl-mconsole -O2 -threaded
+  else
+    ghc-options:         -O2 -threaded
+
   main-is:             Main.hs
   -- other-modules:
   -- other-extensions:

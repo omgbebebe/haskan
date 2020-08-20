@@ -1,0 +1,6 @@
+[submodule "3rdparty/dynamic-graphs"]
+	path = 3rdparty/dynamic-graphs
+	url = gitea@gitea.local:omg/dynamic-graphs.git
+[submodule "3rdparty/vulkan-api"]
+	path = 3rdparty/vulkan-api
+	url = gitea@gitea.local:omg/vulkan-api.git
