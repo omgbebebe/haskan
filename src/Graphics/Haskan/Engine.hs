@@ -482,7 +482,8 @@ modelMatrix =
     --translate = identity & translation .~ V3 0 0 (5.0)
     rotate = identity
     translate = identity
-  in Linear.Matrix.transpose $ translate !*! rotate
+  --in Linear.Matrix.transpose $ translate !*! rotate
+  in translate !*! rotate
 --  Linear.Matrix.identity
 
 {-
@@ -492,11 +493,12 @@ viewMatrix eyePos target = Linear.Matrix.transpose $
 -}
 projectionMatrix :: M44 Foreign.C.CFloat
 projectionMatrix = Linear.Matrix.transpose $
-  Linear.Projection.infinitePerspective
+--  Linear.Projection.infinitePerspective
+  Linear.Projection.perspective
     (pi / 12) -- FOV
     (16/9) -- aspect ratio
     0.1 -- near plane
---    100.0 -- far plane
+    10000.0 -- far plane
 
 --  in Linear.Matrix.transpose (projection !*! view !*! model)
 
