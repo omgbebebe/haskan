@@ -43,6 +43,7 @@ library
                        Graphics.Haskan.Engine
                        Graphics.Haskan.Events
                        Graphics.Haskan.Face
+                       Graphics.Haskan.Gltf
                        Graphics.Haskan.Resources
                        Graphics.Haskan.Scene
                        Graphics.Haskan.Logger
@@ -87,6 +88,7 @@ library
                      , containers
                      , contravariant
                      , dynamic-graphs >=0.1.0.4
+                     , fgl >=5.7.0.3
                      , hashable
                      , JuicyPixels >=3.3.5
                      , lens
@@ -94,6 +96,7 @@ library
                      , managed >=1.0.7
                      , megaparsec
                      , pretty-simple
+                     , random
                      , say
                      , scientific
                      , sdl2 >=2.5.2
