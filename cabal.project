@@ -1,3 +1,4 @@
 packages: ./
           ./3rdparty/vulkan-api/vulkan-api
           ./3rdparty/dynamic-graphs
+          ./3rdparty/aeson-schema

@@ -4,3 +4,9 @@
 [submodule "3rdparty/vulkan-api"]
 	path = 3rdparty/vulkan-api
 	url = gitea@gitea.local:omg/vulkan-api.git
+[submodule "3rdparty/glTF"]
+	path = 3rdparty/glTF
+	url = https://github.com/KhronosGroup/glTF.git
+[submodule "3rdparty/aeson-schema"]
+	path = 3rdparty/aeson-schema
+	url = gitea@gitea.local:omg/aeson-schema.git

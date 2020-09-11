@@ -5,7 +5,7 @@ let
   myghc = unstable.haskell.packages.${compiler}.ghcWithPackages (ps: with ps; [
           cabal-install
         ]);
-  libs = [ SDL2 zlib ];
+  libs = [ SDL2 zlib pcre ];
 in
 pkgs.stdenv.mkDerivation {
   name = "Haskan";
